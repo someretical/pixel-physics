@@ -21,7 +21,13 @@ target_link_libraries(pixels PRIVATE SDL3::SDL3-static)
 
 target_link_libraries(pixels PRIVATE glm::glm)
 
-if(CMAKE_BUILD_TYPE MATCHES Release)
+set(TARGET_METADATA "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_CXX_COMPILER_ID}-${CMAKE_BUILD_TYPE}")
+set_target_properties(pixels PROPERTIES
+        OUTPUT_NAME "${CMAKE_PROJECT_NAME}-${TARGET_METADATA}"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+if (CMAKE_BUILD_TYPE MATCHES Release)
     # Let CMake generate the executable for windows without a console
     set_target_properties(pixels PROPERTIES WIN32_EXECUTABLE TRUE)
-endif()
+endif ()
