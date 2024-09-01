@@ -29,60 +29,60 @@ void process_physics(AppContext *app) {
             }
 
             switch (cell.material) {
-                case Material::END_MARKER: {
-                    break;
-                }
+                case Material::END_MARKER:
                 case Material::Air: {
                     break;
                 }
                 case Material::RedSand:
                 case Material::Sand: {
-                    if (!cell.displacable) {
-                        goto sand_end;
-                    }
-
-                    if (y >= level_size.y - 1) {
-                        cell.has_been_updated = true;
+                    if (!cell.displaceable) {
                         break;
                     }
 
+                    // We want to track how far down it can fall and if it can fall at all
                     cell.velocity.y += g;
-                    int fallen_by = 1;
-                    bool stopped = false;
-                    while (fallen_by <= cell.velocity.y and not stopped) {
-                        auto below = glm::ivec2{x, y + fallen_by};
-                        if (below.y >= level_size.y) {
-                            stopped = true;
+                    int s_y = 0;
+                    // If s_y is equal to cell.velocity.y then we are not obstructed
+                    while (s_y < cell.velocity.y) {
+                        auto next = glm::ivec2{x, y + s_y + 1};
+                        if (next.y >= level_size.y) {
+                            // We can examine s_y afterward to see how far we fell
+                            // If s_y is 0, then we did not fall at all as we reached the bottom already
                             break;
                         }
 
-                        auto &below_cell = app->cells[below.y][below.x];
-                        if (below_cell.displacable and density_le_chance(below_cell, cell, app->rng)) {
-                            fallen_by++;
-                            continue;
+                        auto &next_cell = app->cells[next.y][next.x];
+                        if (next_cell.displaceable and density_le_chance(next_cell, cell, app->rng)) {
+                            s_y++;
+                        } else {
+                            // The particle hit something that is not displaceable and/or
+                            // that something is denser than it and the particle stops falling because of it
+                            break;
                         }
-
-                        // We have hit something that is not displacable and/or is more dense than us and we lost the lottery so we need to stop
-                        stopped = true;
                     }
-                    fallen_by -= 1;
 
-                    if (fallen_by != 0) {
-                        for (auto i{0}; i < fallen_by; i++) {
-                            auto &curcell = app->cells[y + i][x];
-                            auto &nextcell = app->cells[y + i + 1][x];
-                            curcell.has_been_updated = true;
-                            nextcell.has_been_updated = true;
-                            std::swap(curcell, nextcell);
-                        }
-
-                        if (not stopped) {
-                            cell.velocity.y = 0;
+                    if (s_y == 0 and y == level_size.y - 1) {
+                        // We are at the bottom, and we cannot fall any further, so we cancel v_y
+                        cell.velocity.y = 0;
+                        cell.has_been_updated = true;
+                        break;
+                    } else if (s_y == 0) {
+                        // We could not fall any further straight down,
+                        // but we can still fall to the side
+                        // So we cancel v_y and continue past this entire if block...
+                        cell.velocity.y = 0;
+                    } else {
+                        // We can fall down by s_y cells
+                        // Since we are falling vertically, we cannot use memmove
+                        for (auto i{0}; i < s_y; i++) {
+                            auto &cur = app->cells[y + i][x];
+                            auto &next = app->cells[y + i + 1][x];
+                            cur.has_been_updated = true;
+                            next.has_been_updated = true;
+                            std::swap(cur, next);
                         }
                         break;
                     }
-
-                    cell.velocity.y = 0;
 
                     glm::ivec2 below_left{x - 1, y + 1};
                     glm::ivec2 below_right{x + 1, y + 1};
@@ -96,7 +96,7 @@ void process_physics(AppContext *app) {
                         }
 
                         auto &point_cell = app->cells[point.y][point.x];
-                        if (point_cell.displacable and density_le_chance(point_cell, cell, app->rng)) {
+                        if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
                             cell.has_been_updated = true;
                             point_cell.has_been_updated = true;
                             std::swap(cell, point_cell);
@@ -107,52 +107,54 @@ void process_physics(AppContext *app) {
                     sand_end:
                     break;
                 case Material::Water: {
-                    if (!cell.displacable) {
-                        goto water_end;
-                    }
-
-                    if (y >= level_size.y - 1) {
-                        cell.has_been_updated = true;
+                    if (!cell.displaceable) {
                         break;
                     }
 
+                    // We want to track how far down it can fall and if it can fall at all
                     cell.velocity.y += g;
-                    int fallen_by = 1;
-                    bool stopped = false;
-                    while (fallen_by <= cell.velocity.y and not stopped) {
-                        auto below = glm::ivec2{x, y + fallen_by};
-                        if (below.y >= level_size.y) {
-                            stopped = true;
+                    int s_y = 0;
+                    // If s_y is equal to cell.velocity.y then we are not obstructed
+                    while (s_y < cell.velocity.y) {
+                        auto next = glm::ivec2{x, y + s_y + 1};
+                        if (next.y >= level_size.y) {
+                            // We can examine s_y afterward to see how far we fell
+                            // If s_y is 0, then we did not fall at all as we reached the bottom already
                             break;
                         }
 
-                        auto &below_cell = app->cells[below.y][below.x];
-                        if (below_cell.displacable and density_le_chance(below_cell, cell, app->rng)) {
-                            fallen_by++;
-                            continue;
+                        auto &next_cell = app->cells[next.y][next.x];
+                        if (next_cell.displaceable and density_le_chance(next_cell, cell, app->rng)) {
+                            s_y++;
+                        } else {
+                            // The particle hit something that is not displaceable and/or
+                            // that something is denser than it and the particle stops falling because of it
+                            break;
                         }
-
-                        // We have hit something that is not displacable and/or is more dense than us and we lost the lottery so we need to stop
-                        stopped = true;
                     }
-                    fallen_by -= 1;
 
-                    if (fallen_by != 0) {
-                        for (auto i{0}; i < fallen_by; i++) {
-                            auto &curcell = app->cells[y + i][x];
-                            auto &nextcell = app->cells[y + i + 1][x];
-                            curcell.has_been_updated = true;
-                            nextcell.has_been_updated = true;
-                            std::swap(curcell, nextcell);
-                        }
-
-                        if (not stopped) {
-                            cell.velocity.y = 0;
+                    if (s_y == 0 and y == level_size.y - 1) {
+                        // We are at the bottom, and we cannot fall any further, so we cancel v_y
+                        cell.velocity.y = 0;
+                        cell.has_been_updated = true;
+                        break;
+                    } else if (s_y == 0) {
+                        // We could not fall any further straight down,
+                        // but we can still fall to the side
+                        // So we cancel v_y and continue past this entire if block...
+                        cell.velocity.y = 0;
+                    } else {
+                        // We can fall down by s_y cells
+                        // Since we are falling vertically, we cannot use memmove
+                        for (auto i{0}; i < s_y; i++) {
+                            auto &cur = app->cells[y + i][x];
+                            auto &next = app->cells[y + i + 1][x];
+                            cur.has_been_updated = true;
+                            next.has_been_updated = true;
+                            std::swap(cur, next);
                         }
                         break;
                     }
-
-                    cell.velocity.y = 0;
 
                     glm::ivec2 below_left{x - 1, y + 1};
                     glm::ivec2 below_right{x + 1, y + 1};
@@ -166,7 +168,7 @@ void process_physics(AppContext *app) {
                         }
 
                         auto &point_cell = app->cells[point.y][point.x];
-                        if (point_cell.displacable and density_le_chance(point_cell, cell, app->rng)) {
+                        if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
                             cell.has_been_updated = true;
                             point_cell.has_been_updated = true;
                             std::swap(cell, point_cell);
@@ -185,7 +187,7 @@ void process_physics(AppContext *app) {
                         }
 
                         auto &point_cell = app->cells[point.y][point.x];
-                        if (point_cell.displacable and density_le_chance(point_cell, cell, app->rng)) {
+                        if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
                             cell.has_been_updated = true;
                             point_cell.has_been_updated = true;
                             std::swap(cell, point_cell);
