@@ -29,7 +29,7 @@ constexpr static std::array material_colour{
 
 constexpr static std::array material_density{
         0.0f,
-        1.5f,
+        1.8f,
         1.0f,
         1.5f,
 };
@@ -48,14 +48,14 @@ constexpr static int g = 1;
 constexpr static SDL_Color background_colour{93, 88, 90, 255};
 
 typedef struct cell_t {
-    glm::vec2 velocity;     // 8 bytes
+    glm::ivec2 velocity;     // 8 bytes
     Material material;      // 1 byte
     bool has_been_updated;  // 1 byte
-    bool displacable;       // 1 byte
+    bool displaceable;       // 1 byte
 
     constexpr cell_t(glm::vec2 velocity, Material material, bool has_been_updated, bool displacable)
             : velocity(
-            velocity), material(material), has_been_updated(has_been_updated), displacable(displacable) {}
+            velocity), material(material), has_been_updated(has_been_updated), displaceable(displacable) {}
 
     constexpr cell_t() : cell_t({0, 0}, Material::Air, true, true) {}
 
