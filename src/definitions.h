@@ -1,13 +1,10 @@
-//
-// Created by 1 on 1/09/2024.
-//
-
 #ifndef PIXELS_DEFINITIONS_H
 #define PIXELS_DEFINITIONS_H
 
 #include <SDL3/SDL_video.h>
 #include <glm/vec2.hpp>
 #include <array>
+#include <utility>
 
 constexpr static glm::i32vec2 level_size{640, 480};
 constexpr static auto window_size{level_size * 2};

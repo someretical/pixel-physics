@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 project(pixels)
+include(CMakePrintHelpers)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 set(SDL_STATIC ON)
@@ -27,7 +29,13 @@ set_target_properties(pixels PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
+if (MSVC)
+    target_link_options(pixels PRIVATE "/MANIFEST:EMBED")
+endif ()
+
 if (CMAKE_BUILD_TYPE MATCHES Release)
     # Let CMake generate the executable for windows without a console
     set_target_properties(pixels PROPERTIES WIN32_EXECUTABLE TRUE)
 endif ()
+
+

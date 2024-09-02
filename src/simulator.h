@@ -3,8 +3,6 @@
 
 #include "AppContext.h"
 
-void process_input(AppContext *app);
-
 void process_physics(AppContext *app);
 
 void process_rendering(AppContext *app);

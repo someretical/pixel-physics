@@ -3,7 +3,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
 
-#include <algorithm>
+#include <utility>
 
 void process_physics(AppContext *app) {
     bool flip = app->rng.gen_int();

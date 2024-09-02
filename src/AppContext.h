@@ -1,7 +1,3 @@
-//
-// Created by 1 on 1/09/2024.
-//
-
 #ifndef PIXELS_APPCONTEXT_H
 #define PIXELS_APPCONTEXT_H
 
