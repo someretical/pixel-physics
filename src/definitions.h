@@ -31,10 +31,10 @@ constexpr static std::array material_density{
         1.5f,
 };
 
-constexpr static std::array material_viscosity{
+constexpr static std::array material_slipperiness{
         0,
         1,
-        3,
+        10,
         1,
 };
 

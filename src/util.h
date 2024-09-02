@@ -50,8 +50,8 @@ auto inline density(const cell_t &cell) {
     return material_density[std::to_underlying(cell.material)];
 }
 
-auto inline viscosity(const cell_t &cell) {
-    return material_viscosity[std::to_underlying(cell.material)];
+auto inline slipperiness(const cell_t &cell) {
+    return material_slipperiness[std::to_underlying(cell.material)];
 }
 
 /*

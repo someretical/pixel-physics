@@ -3,6 +3,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
 
+#include <glm/vec3.hpp>
+
 #include <utility>
 
 static auto check_below_left_right(AppContext *app, const int x, const int y) {
@@ -185,6 +187,66 @@ void process_physics(AppContext *app) {
                                 point_cell.has_been_updated = true;
                                 std::swap(cell, point_cell);
                                 goto water_end;
+                            }
+                        }
+                    }
+
+                    /*
+                     * Water can flow sideways, so we check if we can flow to the left or right
+                     * However, based on its slipperiness, it can flow more than 1 cell to the sides.
+                     */
+                    {
+                        if (slipperiness(cell) == 0) {
+                            goto water_end;
+                        }
+
+                        // TODO account for x velocity
+                        // Pick whether to try left or right
+                        bool flip_1 = app->rng.gen_int();
+                        // Turn 0 or 1 into -1 or 1
+                        auto direction_1 = -(2 * flip_1 - 1);
+
+                        auto s_x = 0;
+                        auto start = direction_1;
+                        auto end = direction_1 * slipperiness(cell);
+                        auto step = direction_1;
+                        for (
+                                auto x_1 = start;
+                                x_1 != end;
+                                x_1 += step
+                                ) {
+                            auto point = glm::ivec2{x + x_1, y};
+                            // We can't move in this direction anymore
+                            if (not check_x_in_range(point.x)) {
+                                break;
+                            }
+
+                            auto &p_cell = app->cells[point.y][point.x];
+                            if (p_cell.displaceable and density_le_chance(p_cell, cell, app->rng)) {
+                                s_x += direction_1;
+                            }
+                        }
+
+                        // We can move to the side
+                        if (s_x != 0) {
+                            for (auto i{0}; i != s_x; i += direction_1) {
+                                auto &cur = app->cells[y][x + i];
+                                auto &next = app->cells[y][x + i + direction_1];
+                                cur.has_been_updated = true;
+                                next.has_been_updated = true;
+                                std::swap(cur, next);
+
+                                // If we move to the side and can then move down, we do so
+                                auto below = glm::ivec2{x + i + direction_1, y + 1};
+                                if (below.y < level_size.y) {
+                                    auto &below_cell = app->cells[below.y][below.x];
+                                    if (below_cell.displaceable and density_le_chance(below_cell, next, app->rng)) {
+                                        below_cell.has_been_updated = true;
+                                        next.has_been_updated = true;
+                                        std::swap(below_cell, next);
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
