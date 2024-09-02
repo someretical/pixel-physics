@@ -62,7 +62,7 @@ auto inline viscosity(const cell_t &cell) {
  */
 auto inline density_le_chance(const cell_t &a, const cell_t &b, Random &rng) {
     auto diff = density(b) - density(a);
-    return static_cast<int>(diff) && rng.gen_real() < diff;
+    return diff != 0.f && rng.gen_real() < diff;
 }
 
 SDL_AppResult SDL_Fail();

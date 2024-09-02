@@ -5,6 +5,32 @@
 
 #include <utility>
 
+static auto check_below_left_right(AppContext *app, const int x, const int y) {
+    auto &cell = app->cells[y][x];
+
+    glm::ivec2 below_left{x - 1, y + 1};
+    glm::ivec2 below_right{x + 1, y + 1};
+    auto first = app->rng.gen_int() ? below_left : below_right;
+    auto second = app->rng.gen_int() ? below_right : below_left;
+    std::array points{first, second};
+
+    for (auto &point: points) {
+        if (not check_x_in_range(point.x)) {
+            continue;
+        }
+
+        auto &point_cell = app->cells[point.y][point.x];
+        if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
+            cell.has_been_updated = true;
+            point_cell.has_been_updated = true;
+            std::swap(cell, point_cell);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void process_physics(AppContext *app) {
     bool flip = app->rng.gen_int();
     // Turn 0 or 1 into -1 or 1
@@ -38,9 +64,8 @@ void process_physics(AppContext *app) {
                     if (!cell.displaceable) {
                         break;
                     }
-
                     // We want to track how far down it can fall and if it can fall at all
-                    cell.velocity.y += g;
+                    cell.velocity.y = std::clamp(cell.velocity.y + g, min_y_velocity, max_y_velocity);
                     int s_y = 0;
                     // If s_y is equal to cell.velocity.y then we are not obstructed
                     while (s_y < cell.velocity.y) {
@@ -84,28 +109,9 @@ void process_physics(AppContext *app) {
                         break;
                     }
 
-                    glm::ivec2 below_left{x - 1, y + 1};
-                    glm::ivec2 below_right{x + 1, y + 1};
-                    auto first = app->rng.gen_int() ? below_left : below_right;
-                    auto second = app->rng.gen_int() ? below_right : below_left;
-                    std::array points{first, second};
-
-                    for (auto &point: points) {
-                        if (not check_x_in_range(point.x)) {
-                            continue;
-                        }
-
-                        auto &point_cell = app->cells[point.y][point.x];
-                        if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
-                            cell.has_been_updated = true;
-                            point_cell.has_been_updated = true;
-                            std::swap(cell, point_cell);
-                            goto sand_end;
-                        }
-                    }
-                }
-                    sand_end:
+                    check_below_left_right(app, x, y);
                     break;
+                }
                 case Material::Water: {
                     if (!cell.displaceable) {
                         break;
@@ -135,9 +141,9 @@ void process_physics(AppContext *app) {
 
                     if (s_y == 0 and y == level_size.y - 1) {
                         // We are at the bottom, and we cannot fall any further, so we cancel v_y
+                        // However, water can still flow sideways so we jump to that part of the code
                         cell.velocity.y = 0;
-                        cell.has_been_updated = true;
-                        break;
+                        goto water_check_sides;
                     } else if (s_y == 0) {
                         // We could not fall any further straight down,
                         // but we can still fall to the side
@@ -156,47 +162,36 @@ void process_physics(AppContext *app) {
                         break;
                     }
 
-                    glm::ivec2 below_left{x - 1, y + 1};
-                    glm::ivec2 below_right{x + 1, y + 1};
-                    auto first = app->rng.gen_int() ? below_left : below_right;
-                    auto second = app->rng.gen_int() ? below_right : below_left;
-                    std::array points{first, second};
+                    if (check_below_left_right(app, x, y)) {
+                        break;
+                    }
 
-                    for (auto &point: points) {
-                        if (not check_x_in_range(point.x)) {
-                            continue;
-                        }
+                    water_check_sides:
+                    {
+                        auto left = glm::ivec2{x - 1, y};
+                        auto right = glm::ivec2{x + 1, y};
+                        auto first = app->rng.gen_int() ? left : right;
+                        auto second = app->rng.gen_int() ? right : left;
+                        std::array points{first, second};
 
-                        auto &point_cell = app->cells[point.y][point.x];
-                        if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
-                            cell.has_been_updated = true;
-                            point_cell.has_been_updated = true;
-                            std::swap(cell, point_cell);
-                            goto water_end;
+                        for (auto &point: points) {
+                            if (not check_x_in_range(point.x)) {
+                                continue;
+                            }
+
+                            auto &point_cell = app->cells[point.y][point.x];
+                            if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
+                                cell.has_been_updated = true;
+                                point_cell.has_been_updated = true;
+                                std::swap(cell, point_cell);
+                                goto water_end;
+                            }
                         }
                     }
 
-                    auto left = glm::ivec2{x - 1, y};
-                    auto right = glm::ivec2{x + 1, y};
-                    first = app->rng.gen_int() ? left : right;
-                    second = app->rng.gen_int() ? right : left;
-
-                    for (auto &point: std::array{first, second}) {
-                        if (not check_x_in_range(point.x)) {
-                            continue;
-                        }
-
-                        auto &point_cell = app->cells[point.y][point.x];
-                        if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
-                            cell.has_been_updated = true;
-                            point_cell.has_been_updated = true;
-                            std::swap(cell, point_cell);
-                            goto water_end;
-                        }
-                    }
-                }
                     water_end:
                     break;
+                }
             }
         }
     }

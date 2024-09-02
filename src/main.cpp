@@ -81,6 +81,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, const SDL_Event *event) {
                             for (auto j{top_left.x}; j < bottom_right.x; j++) {
                                 app->cells[i][j].material = app->selected_material;
                                 app->cells[i][j].has_been_updated = true;
+                                app->cells[i][j].displaceable = true;
                             }
                         }
                         break;

@@ -41,6 +41,8 @@ constexpr static std::array material_viscosity{
 static_assert(material_colour.size() == std::to_underlying(Material::END_MARKER));
 
 constexpr static int g = 1;
+constexpr static int max_y_velocity = 8;
+constexpr static int min_y_velocity = -8;
 
 constexpr static SDL_Color background_colour{93, 88, 90, 255};
 
