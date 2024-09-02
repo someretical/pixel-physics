@@ -7,31 +7,6 @@
 
 #include <utility>
 
-static auto check_below_left_right(AppContext *app, const int x, const int y) {
-    auto &cell = app->cells[y][x];
-
-    glm::ivec2 below_left{x - 1, y + 1};
-    glm::ivec2 below_right{x + 1, y + 1};
-    auto first = app->rng.gen_int() ? below_left : below_right;
-    auto second = app->rng.gen_int() ? below_right : below_left;
-    std::array points{first, second};
-
-    for (auto &point: points) {
-        if (not check_x_in_range(point.x)) {
-            continue;
-        }
-
-        auto &point_cell = app->cells[point.y][point.x];
-        if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
-            cell.has_been_updated = true;
-            point_cell.has_been_updated = true;
-            std::swap(cell, point_cell);
-            return true;
-        }
-    }
-
-    return false;
-}
 
 void process_physics(AppContext *app) {
     bool flip = app->rng.gen_int();
@@ -91,6 +66,9 @@ void process_physics(AppContext *app) {
                     if (s_y == 0 and y == level_size.y - 1) {
                         // We are at the bottom, and we cannot fall any further, so we cancel v_y
                         cell.velocity.y = 0;
+
+                        // This line is different for sand and water
+                        // In fact this branch doesn't exist for water
                         cell.has_been_updated = true;
                         break;
                     } else if (s_y == 0) {
@@ -111,7 +89,29 @@ void process_physics(AppContext *app) {
                         break;
                     }
 
-                    check_below_left_right(app, x, y);
+                    // Do not try the strategy of moving to the left and then moving down in one go!
+                    // Or rather, you could try it but I already did and my result looked funky
+                    // This method looks a lot more natural.
+                    glm::ivec2 below_left{x - 1, y + 1};
+                    glm::ivec2 below_right{x + 1, y + 1};
+                    auto first = app->rng.gen_int() ? below_left : below_right;
+                    auto second = app->rng.gen_int() ? below_right : below_left;
+                    std::array points{first, second};
+
+                    for (auto &point: points) {
+                        if (not check_x_in_range(point.x)) {
+                            continue;
+                        }
+
+                        auto &point_cell = app->cells[point.y][point.x];
+                        if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
+                            cell.has_been_updated = true;
+                            point_cell.has_been_updated = true;
+                            std::swap(cell, point_cell);
+                            break;
+                        }
+                    }
+
                     break;
                 }
                 case Material::Water: {
@@ -141,12 +141,7 @@ void process_physics(AppContext *app) {
                         }
                     }
 
-                    if (s_y == 0 and y == level_size.y - 1) {
-                        // We are at the bottom, and we cannot fall any further, so we cancel v_y
-                        // However, water can still flow sideways so we jump to that part of the code
-                        cell.velocity.y = 0;
-                        goto water_check_sides;
-                    } else if (s_y == 0) {
+                    if (s_y == 0) {
                         // We could not fall any further straight down,
                         // but we can still fall to the side
                         // So we cancel v_y and continue past this entire if block...
@@ -161,97 +156,69 @@ void process_physics(AppContext *app) {
                             next.has_been_updated = true;
                             std::swap(cur, next);
                         }
+
+                        // Already processed
                         break;
-                    }
-
-                    if (check_below_left_right(app, x, y)) {
-                        break;
-                    }
-
-                    water_check_sides:
-                    {
-                        auto left = glm::ivec2{x - 1, y};
-                        auto right = glm::ivec2{x + 1, y};
-                        auto first = app->rng.gen_int() ? left : right;
-                        auto second = app->rng.gen_int() ? right : left;
-                        std::array points{first, second};
-
-                        for (auto &point: points) {
-                            if (not check_x_in_range(point.x)) {
-                                continue;
-                            }
-
-                            auto &point_cell = app->cells[point.y][point.x];
-                            if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
-                                cell.has_been_updated = true;
-                                point_cell.has_been_updated = true;
-                                std::swap(cell, point_cell);
-                                goto water_end;
-                            }
-                        }
                     }
 
                     /*
-                     * Water can flow sideways, so we check if we can flow to the left or right
-                     * However, based on its slipperiness, it can flow more than 1 cell to the sides.
+                     * Procedure for water:
+                     * 1. Pick direction (either left or right)
+                     * 2. Attempt to advance in that direction OR if we have reached max slipperiness, terminate the algorithm
+                     * 3. If we can advance, swap the cells
+                     * 4. Try to move down
+                     * 5. If we can move down, swap the cells and terminate the algorithm
+                     * 6. Go back to 2
                      */
-                    {
-                        if (slipperiness(cell) == 0) {
-                            goto water_end;
-                        }
-
-                        // TODO account for x velocity
-                        // Pick whether to try left or right
-                        bool flip_1 = app->rng.gen_int();
-                        // Turn 0 or 1 into -1 or 1
-                        auto direction_1 = -(2 * flip_1 - 1);
-
-                        auto s_x = 0;
-                        auto start = direction_1;
-                        auto end = direction_1 * slipperiness(cell);
-                        auto step = direction_1;
-                        for (
-                                auto x_1 = start;
-                                x_1 != end;
-                                x_1 += step
-                                ) {
-                            auto point = glm::ivec2{x + x_1, y};
-                            // We can't move in this direction anymore
-                            if (not check_x_in_range(point.x)) {
-                                break;
-                            }
-
-                            auto &p_cell = app->cells[point.y][point.x];
-                            if (p_cell.displaceable and density_le_chance(p_cell, cell, app->rng)) {
-                                s_x += direction_1;
-                            }
-                        }
-
-                        // We can move to the side
-                        if (s_x != 0) {
-                            for (auto i{0}; i != s_x; i += direction_1) {
-                                auto &cur = app->cells[y][x + i];
-                                auto &next = app->cells[y][x + i + direction_1];
-                                cur.has_been_updated = true;
-                                next.has_been_updated = true;
-                                std::swap(cur, next);
-
-                                // If we move to the side and can then move down, we do so
-                                auto below = glm::ivec2{x + i + direction_1, y + 1};
-                                if (below.y < level_size.y) {
-                                    auto &below_cell = app->cells[below.y][below.x];
-                                    if (below_cell.displaceable and density_le_chance(below_cell, next, app->rng)) {
-                                        below_cell.has_been_updated = true;
-                                        next.has_been_updated = true;
-                                        std::swap(below_cell, next);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                    int slip_dir;
+                    if (cell.velocity.x == 0) {
+                        slip_dir = app->rng.gen_int() ? -1 : 1;
+                        cell.velocity.x = slip_dir;
+                    } else if (cell.velocity.x > 0) {
+                        slip_dir = 1;
+                    } else {
+                        slip_dir = -1;
                     }
 
-                    water_end:
+                    auto max_slip = slipperiness(cell) * slip_dir;
+                    auto s_x = 0;
+
+                    while (max_slip != 0 and s_x != max_slip) {
+                        auto &cur_x = app->cells[y][x + s_x];
+                        auto next_x = glm::ivec2{x + s_x + slip_dir, y};
+                        if (not check_x_in_range(next_x.x)) {
+                            cur_x.has_been_updated = true;
+                            cur_x.velocity.x = 0;
+                            break;
+                        }
+
+                        auto &next_x_cell = app->cells[next_x.y][next_x.x];
+                        if (next_x_cell.displaceable and density_le_chance(next_x_cell, cur_x, app->rng)) {
+                            cur_x.has_been_updated = true;
+                            next_x_cell.has_been_updated = true;
+                            std::swap(cur_x, next_x_cell);
+
+                            // Check if we can fall down
+                            if (y < level_size.y - 1) {
+                                auto below = glm::ivec2{next_x.x, y + 1};
+                                auto &next_y_cell = app->cells[below.y][below.x];
+                                if (next_y_cell.displaceable and density_le_chance(next_y_cell, next_x_cell, app->rng)) {
+                                    next_y_cell.has_been_updated = true;
+                                    next_x_cell.has_been_updated = true;
+                                    std::swap(next_y_cell, next_x_cell);
+                                    break;
+                                }
+                            }
+                        } else {
+                            cur_x.has_been_updated = true;
+                            cur_x.velocity.x = 0;
+                            next_x_cell.has_been_updated = true;
+                            break;
+                        }
+
+                        s_x += slip_dir;
+                    }
+
                     break;
                 }
             }
