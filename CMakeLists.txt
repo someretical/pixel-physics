@@ -29,6 +29,9 @@ set_target_properties(pixels PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
+get_target_property(CMAKE_OUTPUT_NAME pixels OUTPUT_NAME)
+file(WRITE CMAKE_OUTPUT "${CMAKE_OUTPUT_NAME}")
+
 if (MSVC)
     target_link_options(pixels PRIVATE "/MANIFEST:EMBED")
 endif ()
