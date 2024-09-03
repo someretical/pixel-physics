@@ -3,12 +3,12 @@
 
 #include "definitions.h"
 
-#include <SDL3/SDL.h>
-#include <glm/vec2.hpp>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_render.h>
+#include <glm/ext/vector_int2.hpp>
+#include <pcg_extras.hpp>
 #include <pcg_random.hpp>
-
-#include <algorithm>
-#include <cmath>
 #include <random>
 #include <utility>
 
@@ -25,7 +25,7 @@ public:
 
         uni_int = std::uniform_int_distribution<int>(0, 1);
         uni_real = std::uniform_real_distribution<float>(0.f, 1.f);
-}
+    }
     ~Random() = default;
 
     Random(Random const &) = delete;
@@ -52,36 +52,17 @@ auto inline check_in_lvl_range(const glm::ivec2 point) {
     return check_x_in_lvl_range(point.x) and check_y_in_lvl_range(point.y);
 }
 
-auto inline check_x_in_win_range(const int x) {
-    return x >= 0 and x < window_size.x;
-}
-
-auto inline check_y_in_win_range(const int y) {
-    return y >= 0 and y < window_size.y;
-}
-
-auto inline check_in_win_range(const glm::ivec2 point) {
-    return check_x_in_win_range(point.x) and check_y_in_win_range(point.y);
-}
-
 auto inline colour(const cell_t &cell) {
     return material_colour[std::to_underlying(cell.material)];
 }
 
-auto inline density(const cell_t &cell) {
-    return material_density[std::to_underlying(cell.material)];
-}
+float inline density(const cell_t &cell);
 
 auto inline slipperiness(const cell_t &cell) {
     return material_slipperiness[std::to_underlying(cell.material)];
 }
 
-auto inline get_mouse_info() {
-    glm::vec2 mouse_fpos;
-    auto mouse_state{SDL_GetMouseState(&mouse_fpos.x, &mouse_fpos.y)};
-    glm::ivec2 mouse_pos{std::lround(mouse_fpos.x), std::lround(mouse_fpos.y)};
-    return std::make_pair(mouse_pos, mouse_state);
-}
+std::pair<glm::ivec2, SDL_MouseButtonFlags> get_mouse_info(SDL_Renderer *renderer);
 
 /*
  * If a is MORE dense than b, then b has no chance of sinking below a.
@@ -89,11 +70,8 @@ auto inline get_mouse_info() {
  * and compare it to a random float in the range [0, 1]. If the random float is less than the difference in densities,
  * then b sinks below a.
  */
-auto inline density_le_chance(const cell_t &a, const cell_t &b, Random &rng) {
-    auto diff = density(b) - density(a);
-    return diff != 0.f && rng.gen_real() < diff;
-}
+bool density_le_chance(const cell_t &a, const cell_t &b, Random &rng);
 
 SDL_AppResult SDL_Fail();
 
-#endif //PIXELS_UTIL_H
+#endif // PIXELS_UTIL_H

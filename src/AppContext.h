@@ -4,10 +4,11 @@
 #include "definitions.h"
 #include "util.h"
 
-#include <SDL3/SDL.h>
-#include <pcg_random.hpp>
-
-#include <random>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_pixels.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_video.h>
+#include <array>
 
 struct Cursor {
     enum class BrushShape {
@@ -25,7 +26,6 @@ struct Cursor {
     BrushShape brush_shape = BrushShape::Square;
 };
 
-
 struct AppContext {
     std::array<std::array<cell_t, level_size.x>, level_size.y> cells;
     SDL_Window *window;
@@ -36,13 +36,18 @@ struct AppContext {
     Cursor cursor;
 
     AppContext(SDL_Window *window, SDL_Renderer *renderer) : window(window), renderer(renderer), rng() {
-        frame_buffer = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING,
-                                         window_size.x,
-                                         window_size.y);
+        frame_buffer = SDL_CreateTexture(
+            renderer,
+            SDL_PIXELFORMAT_RGBA32,
+            SDL_TEXTUREACCESS_STREAMING,
+            level_size.x,
+            level_size.y
+        );
         if (not frame_buffer) {
             SDL_Fail();
         }
-        for (auto &&row: cells) {
+        for (auto &row : cells) {
+            //            row.fill(cell_t({0, 0}, Material::Sand, true, true));
             row.fill(air_cell);
         }
     }
@@ -54,4 +59,4 @@ struct AppContext {
     }
 };
 
-#endif //PIXELS_APPCONTEXT_H
+#endif // PIXELS_APPCONTEXT_H

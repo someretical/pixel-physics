@@ -5,10 +5,20 @@
 #include "simulator.h"
 #include "util.h"
 
-#include <SDL3/SDL.h>
+// Can't remove this include
 #include <SDL3/SDL_main.h>
-#include <SDL3/SDL_video.h>
 
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_keycode.h>
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_surface.h>
+#include <SDL3/SDL_timer.h>
+#include <SDL3/SDL_video.h>
+#include <glm/ext/vector_float2.hpp>
 #include <utility>
 
 SDL_AppResult SDL_AppInit(void **appstate, [[maybe_unused]] int argc, [[maybe_unused]] char *argv[]) {
@@ -16,12 +26,12 @@ SDL_AppResult SDL_AppInit(void **appstate, [[maybe_unused]] int argc, [[maybe_un
         return SDL_Fail();
     }
 
-    auto display_id{SDL_GetPrimaryDisplay()};
+    auto display_id{ SDL_GetPrimaryDisplay() };
     if (not display_id) {
         return SDL_Fail();
     }
 
-    auto display_scale{SDL_GetDisplayContentScale(display_id)};
+    auto display_scale{ SDL_GetDisplayContentScale(display_id) };
     if (display_scale == 0.f) {
         return SDL_Fail();
     }
@@ -35,7 +45,14 @@ SDL_AppResult SDL_AppInit(void **appstate, [[maybe_unused]] int argc, [[maybe_un
     if (not renderer) {
         return SDL_Fail();
     }
-    SDL_SetRenderVSync(renderer, SDL_TRUE);
+    SDL_SetRenderVSync(renderer, SDL_WINDOW_SURFACE_VSYNC_ADAPTIVE);
+    SDL_SetRenderLogicalPresentation(
+        renderer,
+        level_size.x,
+        level_size.y,
+        SDL_LOGICAL_PRESENTATION_LETTERBOX,
+        SDL_SCALEMODE_NEAREST
+    );
 
     if (SDL_ShowWindow(window) == SDL_FALSE) {
         return SDL_Fail();
@@ -55,8 +72,8 @@ SDL_AppResult SDL_AppInit(void **appstate, [[maybe_unused]] int argc, [[maybe_un
     }
 
     *appstate = new AppContext{
-            window,
-            renderer,
+        window,
+        renderer,
     };
 
     SDL_Log("Application started successfully!");
@@ -65,27 +82,38 @@ SDL_AppResult SDL_AppInit(void **appstate, [[maybe_unused]] int argc, [[maybe_un
 }
 
 SDL_AppResult SDL_AppEvent(void *appstate, const SDL_Event *event) {
-    auto *app = (AppContext *) appstate;
+    auto *app = (AppContext *)appstate;
+    // There is an issue here where the SDL_AppEvent expects a const event pointer
+    // But SDL_ConvertEventToRenderCoordinates expects a non-const event pointer
+    // So the following line just doesn't work
+    // SDL_ConvertEventToRenderCoordinates(app->renderer, event);
 
     switch (event->type) {
         case SDL_EVENT_MOUSE_WHEEL: {
             if (event->wheel.y > 0) {
-                app->cursor.brush_radius = std::clamp(app->cursor.brush_radius + 1, min_radius, max_radius);
+                app->cursor.brush_radius = std::min(app->cursor.brush_radius + 1, max_radius);
             } else if (event->wheel.y < 0) {
-                app->cursor.brush_radius = std::clamp(app->cursor.brush_radius - 1, min_radius, max_radius);
+                app->cursor.brush_radius = std::max(app->cursor.brush_radius - 1, min_radius);
             }
             break;
         }
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+            glm::vec2 raw_position{ event->button.x, event->button.y };
+            glm::vec2 logical_position;
+            SDL_RenderCoordinatesFromWindow(
+                app->renderer,
+                raw_position.x,
+                raw_position.y,
+                &logical_position.x,
+                &logical_position.y
+            );
+
             switch (event->button.button) {
                 case SDL_BUTTON_MIDDLE: {
-                    auto [mouse_pos, mouse_state] = get_mouse_info();
-                    auto lvl_x = std::clamp(static_cast<int>(mouse_pos.x / 2), 0, level_size.x - 1);
-                    auto lvl_y = std::clamp(static_cast<int>(mouse_pos.y / 2), 0, level_size.y - 1);
-
-                    if (check_in_lvl_range({lvl_x, lvl_y})) {
-                        app->cursor.selected_material = app->cells[lvl_y][lvl_x].material;
+                    if (check_in_lvl_range({ logical_position.x, logical_position.y })) {
+                        app->cursor.selected_material = app->cells[logical_position.y][logical_position.x].material;
                     }
+                    break;
                 }
             }
 
@@ -131,8 +159,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, const SDL_Event *event) {
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
-    auto begin{SDL_GetTicks()};
-    auto *app = (AppContext *) appstate;
+    auto begin{ SDL_GetTicks() };
+    auto *app = (AppContext *)appstate;
 
     process_input(app);
     process_physics(app);
@@ -143,12 +171,12 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         SDL_Delay(16 - elapsed_ticks);
     }
 
-//    SDL_Log("Frame took %i ms", elapsed_ticks);
+    SDL_Log("Frame took %llu ms", elapsed_ticks);
     return app->app_quit;
 }
 
 void SDL_AppQuit(void *appstate) {
-    delete (AppContext *) appstate;
+    delete (AppContext *)appstate;
 
     SDL_Quit();
     SDL_Log("Application quit successfully!");

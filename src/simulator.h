@@ -9,4 +9,4 @@ void process_physics(AppContext *app);
 
 void process_rendering(AppContext *app);
 
-#endif //PIXELS_SIMULATOR_H
+#endif // PIXELS_SIMULATOR_H
