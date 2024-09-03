@@ -68,20 +68,43 @@ SDL_AppResult SDL_AppEvent(void *appstate, const SDL_Event *event) {
     auto *app = (AppContext *) appstate;
 
     switch (event->type) {
+        case SDL_EVENT_MOUSE_WHEEL: {
+            if (event->wheel.y > 0) {
+                app->cursor.brush_radius = std::clamp(app->cursor.brush_radius + 1, min_radius, max_radius);
+            } else if (event->wheel.y < 0) {
+                app->cursor.brush_radius = std::clamp(app->cursor.brush_radius - 1, min_radius, max_radius);
+            }
+            break;
+        }
+        case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+            switch (event->button.button) {
+                case SDL_BUTTON_MIDDLE: {
+                    auto [mouse_pos, mouse_state] = get_mouse_info();
+                    auto lvl_x = std::clamp(static_cast<int>(mouse_pos.x / 2), 0, level_size.x - 1);
+                    auto lvl_y = std::clamp(static_cast<int>(mouse_pos.y / 2), 0, level_size.y - 1);
+
+                    if (check_in_lvl_range({lvl_x, lvl_y})) {
+                        app->cursor.selected_material = app->cells[lvl_y][lvl_x].material;
+                    }
+                }
+            }
+
+            break;
+        }
         case SDL_EVENT_KEY_DOWN: {
             switch (event->key.key) {
                 case SDLK_1: {
-                    app->selected_material = Material::Sand;
+                    app->cursor.selected_material = Material::Sand;
                     SDL_Log("Selected material: Sand");
                     break;
                 }
                 case SDLK_2: {
-                    app->selected_material = Material::Water;
+                    app->cursor.selected_material = Material::Water;
                     SDL_Log("Selected material: Water");
                     break;
                 }
                 case SDLK_3: {
-                    app->selected_material = Material::RedSand;
+                    app->cursor.selected_material = Material::RedSand;
                     SDL_Log("Selected material: Red Sand");
                     break;
                 }
@@ -117,10 +140,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     auto elapsed_ticks = SDL_GetTicks() - begin;
     if (elapsed_ticks < 16) {
-//        SDL_Log("Frame took %i ms", elapsed_ticks);
         SDL_Delay(16 - elapsed_ticks);
     }
 
+//    SDL_Log("Frame took %i ms", elapsed_ticks);
     return app->app_quit;
 }
 

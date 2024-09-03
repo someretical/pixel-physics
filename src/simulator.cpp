@@ -3,28 +3,37 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
 
-#include <glm/vec3.hpp>
-
 #include <utility>
 
 void process_input(AppContext *app) {
     //    auto kb_state{SDL_GetKeyboardState(nullptr)};
     const auto &[mouse_pos, mouse_state] = get_mouse_info();
+    auto radius = app->cursor.brush_radius;
+    auto lvl_x = std::clamp(static_cast<int>(mouse_pos.x / 2), 0, level_size.x - 1);
+    auto lvl_y = std::clamp(static_cast<int>(mouse_pos.y / 2), 0, level_size.y - 1);
+    auto lvl_top_left = glm::ivec2{lvl_x - radius, lvl_y - radius};
+    auto lvl_bottom_right = glm::ivec2{lvl_x + radius, lvl_y + radius};
+    auto lvl_top_right = glm::ivec2{lvl_x + radius, lvl_y - radius};
+    auto lvl_bottom_left = glm::ivec2{lvl_x - radius, lvl_y + radius};
 
     if (mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT)) {
-        auto x = std::clamp(static_cast<int>(mouse_pos.x / 2), 0, level_size.x - 1);
-        auto y = std::clamp(static_cast<int>(mouse_pos.y / 2), 0, level_size.y - 1);
-
-        auto dist = 16;
-        auto top_left = glm::ivec2{std::clamp(x - (dist / 2), 0, level_size.x - 1),
-                                   std::clamp(y - (dist / 2), 0, level_size.y - 1)};
-        auto bottom_right = glm::ivec2{std::clamp(x + (dist / 2), 0, level_size.x - 1),
-                                       std::clamp(y + (dist / 2), 0, level_size.y - 1)};
-        for (auto i{top_left.y}; i < bottom_right.y; i++) {
-            for (auto j{top_left.x}; j < bottom_right.x; j++) {
-                app->cells[i][j].material = app->selected_material;
-                app->cells[i][j].has_been_updated = true;
-                app->cells[i][j].displaceable = true;
+        for (auto i{lvl_top_left.y}; i < lvl_bottom_right.y; i++) {
+            for (auto j{lvl_top_left.x}; j < lvl_bottom_right.x; j++) {
+                if (check_in_lvl_range({j, i})) {
+                    auto &cell = app->cells[i][j];
+                    cell.material = app->cursor.selected_material;
+                    cell.has_been_updated = true;
+                    cell.displaceable = true;
+                    cell.velocity = {0, 0};
+                }
+            }
+        }
+    } else if (mouse_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
+        for (auto i{lvl_top_left.y}; i < lvl_bottom_right.y; i++) {
+            for (auto j{lvl_top_left.x}; j < lvl_bottom_right.x; j++) {
+                if (check_in_lvl_range({j, i})) {
+                    app->cells[i][j] = air_cell;
+                }
             }
         }
     }
@@ -221,17 +230,17 @@ void process_physics(AppContext *app) {
                             std::swap(cur_x, next_x_cell);
 
                             // Check if we can fall down
-                            if (y < level_size.y - 1) {
-                                auto below = glm::ivec2{next_x.x, y + 1};
-                                auto &next_y_cell = app->cells[below.y][below.x];
-                                if (next_y_cell.displaceable and
-                                    density_le_chance(next_y_cell, next_x_cell, app->rng)) {
-                                    next_y_cell.has_been_updated = true;
-                                    next_x_cell.has_been_updated = true;
-                                    std::swap(next_y_cell, next_x_cell);
-                                    break;
-                                }
-                            }
+//                            if (y < level_size.y - 1) {
+//                                auto below = glm::ivec2{next_x.x, y + 1};
+//                                auto &next_y_cell = app->cells[below.y][below.x];
+//                                if (next_y_cell.displaceable and
+//                                    density_le_chance(next_y_cell, next_x_cell, app->rng)) {
+//                                    next_y_cell.has_been_updated = true;
+//                                    next_x_cell.has_been_updated = true;
+//                                    std::swap(next_y_cell, next_x_cell);
+//                                    break;
+//                                }
+//                            }
                         } else {
                             cur_x.has_been_updated = true;
                             cur_x.velocity.x *= -1;
@@ -249,7 +258,7 @@ void process_physics(AppContext *app) {
     }
 }
 
-void draw_cursor(const AppContext *app, SDL_Color *pixels) {
+static void process_cursor(const AppContext *app, SDL_Color *pixels) {
     const auto &[mouse_pos, mouse_state] = get_mouse_info();
     auto radius = app->cursor.brush_radius;
 
@@ -356,16 +365,7 @@ void draw_cursor(const AppContext *app, SDL_Color *pixels) {
     //    }
 }
 
-
-void process_rendering(AppContext *app) {
-    SDL_SetRenderDrawColor(app->renderer, background_colour.r, background_colour.g, background_colour.b,
-                           background_colour.a);
-    SDL_RenderClear(app->renderer);
-
-    SDL_Color *pixels;
-    int pitch = sizeof(SDL_Color) * window_size.x;
-    SDL_LockTexture(app->frame_buffer, nullptr, reinterpret_cast<void **>(&pixels), &pitch);
-
+static void process_brush(AppContext *app, SDL_Color *pixels) {
     for (auto n_y{0}; n_y < level_size.y; n_y++) {
         for (auto n_x{0}; n_x < level_size.x; n_x++) {
             auto &cell = app->cells[n_y][n_x];
@@ -384,8 +384,19 @@ void process_rendering(AppContext *app) {
             }
         }
     }
+}
 
-    draw_cursor(app, pixels);
+void process_rendering(AppContext *app) {
+    SDL_SetRenderDrawColor(app->renderer, background_colour.r, background_colour.g, background_colour.b,
+                           background_colour.a);
+    SDL_RenderClear(app->renderer);
+
+    SDL_Color *pixels;
+    int pitch = sizeof(SDL_Color) * window_size.x;
+    SDL_LockTexture(app->frame_buffer, nullptr, reinterpret_cast<void **>(&pixels), &pitch);
+
+    process_brush(app, pixels);
+    process_cursor(app, pixels);
 
     SDL_UnlockTexture(app->frame_buffer);
     SDL_RenderTexture(app->renderer, app->frame_buffer, nullptr, nullptr);

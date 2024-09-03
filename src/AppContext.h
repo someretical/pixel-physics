@@ -30,7 +30,6 @@ struct AppContext {
     SDL_Renderer *renderer;
     SDL_Texture *frame_buffer;
     SDL_AppResult app_quit = SDL_APP_CONTINUE;
-    Material selected_material = Material::Sand;
     Random rng;
     Cursor cursor;
 

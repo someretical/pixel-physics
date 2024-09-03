@@ -8,7 +8,10 @@ Head to the [actions tab](https://github.com/someretical/pixel-physics/actions) 
 
 ## Controls
 
-- Left click on mouse to place a block of material
+- Left click on mouse to place a pixel of material
+- Right click on mouse to erase all pixels in the brush area
+- Scroll up and down to increase and decrease the size of the brush respectively
+- Middle click to set the brush material to the material of the pixel directly under the cursor
 - Press 1 to select regular sand
 - Press 2 to select water (less dense than regular sand)
 - Press 3 to select red sand (less dense than regular sand but more dense than water)
