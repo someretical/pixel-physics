@@ -11,6 +11,8 @@ add_subdirectory(dependencies/SDL EXCLUDE_FROM_ALL)
 
 add_subdirectory(dependencies/glm EXCLUDE_FROM_ALL)
 
+include_directories(dependencies/pcg-cpp/include)
+
 add_executable(pixels src/main.cpp
         src/util.cpp
         src/util.h

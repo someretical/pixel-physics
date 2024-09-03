@@ -5,6 +5,8 @@
 #include "util.h"
 
 #include <SDL3/SDL.h>
+#include <pcg_random.hpp>
+
 #include <random>
 
 struct Cursor {

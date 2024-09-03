@@ -4,8 +4,8 @@
 #include "definitions.h"
 
 #include <SDL3/SDL.h>
-
 #include <glm/vec2.hpp>
+#include <pcg_random.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -14,19 +14,25 @@
 
 struct Random {
 private:
-    std::mt19937 rng;
-    std::uniform_int_distribution<int> uni;
+    pcg32 rng;
+    std::uniform_int_distribution<int> uni_int;
     std::uniform_real_distribution<float> uni_real;
 
 public:
-    Random() : rng(std::random_device{}()), uni(0, 1), uni_real(0.0f, 1.0f) {}
+    Random() {
+        pcg_extras::seed_seq_from<std::random_device> seed_source;
+        rng.seed(seed_source);
+
+        uni_int = std::uniform_int_distribution<int>(0, 1);
+        uni_real = std::uniform_real_distribution<float>(0.f, 1.f);
+}
     ~Random() = default;
 
     Random(Random const &) = delete;
     void operator=(Random const &x) = delete;
 
     auto gen_int() {
-        return uni(rng);
+        return uni_int(rng);
     }
 
     auto gen_real() {

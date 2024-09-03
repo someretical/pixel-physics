@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL_video.h>
 #include <glm/vec2.hpp>
+
 #include <array>
 #include <utility>
 
