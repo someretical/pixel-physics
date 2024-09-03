@@ -7,6 +7,23 @@
 #include <SDL3/SDL.h>
 #include <random>
 
+struct Cursor {
+    enum class BrushShape {
+        Square,
+        Circle
+    };
+
+    enum class BrushStroke {
+        Fill,
+        Dotted,
+    };
+
+    Material selected_material = Material::Sand;
+    int brush_radius = 10;
+    BrushShape brush_shape = BrushShape::Square;
+};
+
+
 struct AppContext {
     std::array<std::array<cell_t, level_size.x>, level_size.y> cells;
     SDL_Window *window;
@@ -15,6 +32,7 @@ struct AppContext {
     SDL_AppResult app_quit = SDL_APP_CONTINUE;
     Material selected_material = Material::Sand;
     Random rng;
+    Cursor cursor;
 
     AppContext(SDL_Window *window, SDL_Renderer *renderer) : window(window), renderer(renderer), rng() {
         frame_buffer = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING,

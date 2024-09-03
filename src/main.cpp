@@ -26,7 +26,7 @@ SDL_AppResult SDL_AppInit(void **appstate, [[maybe_unused]] int argc, [[maybe_un
         return SDL_Fail();
     }
 
-    SDL_Window *window = SDL_CreateWindow("Pixel Physics", window_size.x, window_size.y, 0);
+    SDL_Window *window = SDL_CreateWindow("Pixel Physics", window_size.x, window_size.y, SDL_WINDOW_KEYBOARD_GRABBED);
     if (not window) {
         return SDL_Fail();
     }
@@ -68,30 +68,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, const SDL_Event *event) {
     auto *app = (AppContext *) appstate;
 
     switch (event->type) {
-            case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-                switch (event->button.button) {
-                    case SDL_BUTTON_LEFT: {
-                        auto x = std::clamp(static_cast<int>(event->button.x / 2), 0, level_size.x - 1);
-                        auto y = std::clamp(static_cast<int>(event->button.y / 2), 0, level_size.y - 1);
-
-                        auto dist = 16;
-                        auto top_left = glm::ivec2{std::clamp(x - (dist / 2), 0, level_size.x - 1), std::clamp(y - (dist / 2), 0, level_size.y - 1)};
-                        auto bottom_right = glm::ivec2{std::clamp(x + (dist / 2), 0, level_size.x - 1), std::clamp(y + (dist / 2), 0, level_size.y - 1)};
-                        for (auto i{top_left.y}; i < bottom_right.y; i++) {
-                            for (auto j{top_left.x}; j < bottom_right.x; j++) {
-                                app->cells[i][j].material = app->selected_material;
-                                app->cells[i][j].has_been_updated = true;
-                                app->cells[i][j].displaceable = true;
-                            }
-                        }
-                        break;
-                    }
-                    default: {
-                        break;
-                    }
-                }
-                break;
-            }
         case SDL_EVENT_KEY_DOWN: {
             switch (event->key.key) {
                 case SDLK_1: {
@@ -119,9 +95,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, const SDL_Event *event) {
             }
             break;
         }
-//        case SDL_EVENT_KEY_UP: {
-//            break;
-//        }
         case SDL_EVENT_QUIT: {
             app->app_quit = SDL_APP_SUCCESS;
             break;
@@ -138,11 +111,13 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     auto begin{SDL_GetTicks()};
     auto *app = (AppContext *) appstate;
 
+    process_input(app);
     process_physics(app);
     process_rendering(app);
 
     auto elapsed_ticks = SDL_GetTicks() - begin;
     if (elapsed_ticks < 16) {
+//        SDL_Log("Frame took %i ms", elapsed_ticks);
         SDL_Delay(16 - elapsed_ticks);
     }
 

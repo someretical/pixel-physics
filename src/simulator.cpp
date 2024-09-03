@@ -7,6 +7,28 @@
 
 #include <utility>
 
+void process_input(AppContext *app) {
+    //    auto kb_state{SDL_GetKeyboardState(nullptr)};
+    const auto &[mouse_pos, mouse_state] = get_mouse_info();
+
+    if (mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+        auto x = std::clamp(static_cast<int>(mouse_pos.x / 2), 0, level_size.x - 1);
+        auto y = std::clamp(static_cast<int>(mouse_pos.y / 2), 0, level_size.y - 1);
+
+        auto dist = 16;
+        auto top_left = glm::ivec2{std::clamp(x - (dist / 2), 0, level_size.x - 1),
+                                   std::clamp(y - (dist / 2), 0, level_size.y - 1)};
+        auto bottom_right = glm::ivec2{std::clamp(x + (dist / 2), 0, level_size.x - 1),
+                                       std::clamp(y + (dist / 2), 0, level_size.y - 1)};
+        for (auto i{top_left.y}; i < bottom_right.y; i++) {
+            for (auto j{top_left.x}; j < bottom_right.x; j++) {
+                app->cells[i][j].material = app->selected_material;
+                app->cells[i][j].has_been_updated = true;
+                app->cells[i][j].displaceable = true;
+            }
+        }
+    }
+}
 
 void process_physics(AppContext *app) {
     bool flip = app->rng.gen_int();
@@ -38,7 +60,7 @@ void process_physics(AppContext *app) {
                 }
                 case Material::RedSand:
                 case Material::Sand: {
-                    if (!cell.displaceable) {
+                    if (not cell.displaceable) {
                         break;
                     }
                     // We want to track how far down it can fall and if it can fall at all
@@ -99,7 +121,7 @@ void process_physics(AppContext *app) {
                     std::array points{first, second};
 
                     for (auto &point: points) {
-                        if (not check_x_in_range(point.x)) {
+                        if (not check_x_in_lvl_range(point.x)) {
                             continue;
                         }
 
@@ -115,7 +137,7 @@ void process_physics(AppContext *app) {
                     break;
                 }
                 case Material::Water: {
-                    if (!cell.displaceable) {
+                    if (not cell.displaceable) {
                         break;
                     }
 
@@ -183,12 +205,12 @@ void process_physics(AppContext *app) {
                     auto max_slip = slipperiness(cell) * slip_dir;
                     auto s_x = 0;
 
-                    while (max_slip != 0 and s_x != max_slip) {
+                    while (s_x != max_slip) {
                         auto &cur_x = app->cells[y][x + s_x];
                         auto next_x = glm::ivec2{x + s_x + slip_dir, y};
-                        if (not check_x_in_range(next_x.x)) {
+                        if (not check_x_in_lvl_range(next_x.x)) {
                             cur_x.has_been_updated = true;
-                            cur_x.velocity.x = 0;
+                            cur_x.velocity.x *= -1;
                             break;
                         }
 
@@ -202,7 +224,8 @@ void process_physics(AppContext *app) {
                             if (y < level_size.y - 1) {
                                 auto below = glm::ivec2{next_x.x, y + 1};
                                 auto &next_y_cell = app->cells[below.y][below.x];
-                                if (next_y_cell.displaceable and density_le_chance(next_y_cell, next_x_cell, app->rng)) {
+                                if (next_y_cell.displaceable and
+                                    density_le_chance(next_y_cell, next_x_cell, app->rng)) {
                                     next_y_cell.has_been_updated = true;
                                     next_x_cell.has_been_updated = true;
                                     std::swap(next_y_cell, next_x_cell);
@@ -211,7 +234,7 @@ void process_physics(AppContext *app) {
                             }
                         } else {
                             cur_x.has_been_updated = true;
-                            cur_x.velocity.x = 0;
+                            cur_x.velocity.x *= -1;
                             next_x_cell.has_been_updated = true;
                             break;
                         }
@@ -226,6 +249,114 @@ void process_physics(AppContext *app) {
     }
 }
 
+void draw_cursor(const AppContext *app, SDL_Color *pixels) {
+    const auto &[mouse_pos, mouse_state] = get_mouse_info();
+    auto radius = app->cursor.brush_radius;
+
+    // This version aligns the cursor to the cell grid
+    auto lvl_x = std::clamp(static_cast<int>(mouse_pos.x / 2), 0, level_size.x - 1);
+    auto lvl_y = std::clamp(static_cast<int>(mouse_pos.y / 2), 0, level_size.y - 1);
+    auto lvl_top_left = glm::ivec2{lvl_x - radius, lvl_y - radius};
+    auto lvl_bottom_right = glm::ivec2{lvl_x + radius, lvl_y + radius};
+    auto lvl_top_right = glm::ivec2{lvl_x + radius, lvl_y - radius};
+    auto lvl_bottom_left = glm::ivec2{lvl_x - radius, lvl_y + radius};
+
+    for (auto y{lvl_top_left.y}; y <= lvl_bottom_right.y; y++) {
+        if (check_in_lvl_range({lvl_top_left.x, y})) {
+            std::array points{
+                    glm::ivec2{lvl_top_left.x * 2, y * 2},
+                    glm::ivec2{lvl_top_left.x * 2 + 1, y * 2},
+                    glm::ivec2{lvl_top_left.x * 2, y * 2 + 1},
+                    glm::ivec2{lvl_top_left.x * 2 + 1, y * 2 + 1},
+            };
+
+            for (auto point: points) {
+                memcpy(reinterpret_cast<void *>(pixels + (point.y * window_size.x + point.x)), &cursor_colour,
+                       sizeof(SDL_Color));
+            }
+        }
+    }
+
+    for (auto y{lvl_top_right.y}; y <= lvl_bottom_right.y; y++) {
+        if (check_in_lvl_range({lvl_top_right.x, y})) {
+            std::array points{
+                    glm::ivec2{lvl_top_right.x * 2, y * 2},
+                    glm::ivec2{lvl_top_right.x * 2 + 1, y * 2},
+                    glm::ivec2{lvl_top_right.x * 2, y * 2 + 1},
+                    glm::ivec2{lvl_top_right.x * 2 + 1, y * 2 + 1},
+            };
+
+            for (auto point: points) {
+                memcpy(reinterpret_cast<void *>(pixels + (point.y * window_size.x + point.x)), &cursor_colour,
+                       sizeof(SDL_Color));
+            }
+        }
+    }
+
+    for (auto x{lvl_top_left.x}; x <= lvl_top_right.x; x++) {
+        if (check_in_lvl_range({x, lvl_top_left.y})) {
+            std::array points{
+                    glm::ivec2{x * 2, lvl_top_left.y * 2},
+                    glm::ivec2{x * 2 + 1, lvl_top_left.y * 2},
+                    glm::ivec2{x * 2, lvl_top_left.y * 2 + 1},
+                    glm::ivec2{x * 2 + 1, lvl_top_left.y * 2 + 1},
+            };
+
+            for (auto point: points) {
+                memcpy(reinterpret_cast<void *>(pixels + (point.y * window_size.x + point.x)), &cursor_colour,
+                       sizeof(SDL_Color));
+            }
+        }
+    }
+
+    for (auto x{lvl_bottom_left.x}; x <= lvl_bottom_right.x; x++) {
+        if (check_in_lvl_range({x, lvl_bottom_left.y})) {
+            std::array points{
+                    glm::ivec2{x * 2, lvl_bottom_left.y * 2},
+                    glm::ivec2{x * 2 + 1, lvl_bottom_left.y * 2},
+                    glm::ivec2{x * 2, lvl_bottom_left.y * 2 + 1},
+                    glm::ivec2{x * 2 + 1, lvl_bottom_left.y * 2 + 1},
+            };
+
+            for (auto point: points) {
+                memcpy(reinterpret_cast<void *>(pixels + (point.y * window_size.x + point.x)), &cursor_colour,
+                       sizeof(SDL_Color));
+            }
+        }
+    }
+
+    // This version aligns the cursor to the pixel grid. Each cell takes up 2x2 pixels
+    //    auto top_left = glm::ivec2{mouse_pos.x - radius, mouse_pos.y - radius};
+    //    auto top_right = glm::ivec2{mouse_pos.x + radius, mouse_pos.y - radius};
+    //    auto bottom_left = glm::ivec2{mouse_pos.x - radius, mouse_pos.y + radius};
+    //    auto bottom_right = glm::ivec2{mouse_pos.x + radius, mouse_pos.y + radius};
+    //
+    //    for (auto y{top_left.y}; y <= bottom_right.y; y++) {
+    //        if (check_in_win_range({top_left.x, y})) {
+    //            memcpy(reinterpret_cast<void *>(pixels + (y * window_size.x + top_left.x)), &cursor_colour, sizeof(SDL_Color));
+    //        }
+    //    }
+    //
+    //    for (auto y{top_right.y}; y <= bottom_right.y; y++) {
+    //        if (check_in_win_range({top_right.x, y})) {
+    //            memcpy(reinterpret_cast<void *>(pixels + (y * window_size.x + top_right.x)), &cursor_colour, sizeof(SDL_Color));
+    //        }
+    //    }
+    //
+    //    for (auto x{top_left.x}; x <= top_right.x; x++) {
+    //        if (check_in_win_range({x, top_left.y})) {
+    //            memcpy(reinterpret_cast<void *>(pixels + (top_left.y * window_size.x + x)), &cursor_colour, sizeof(SDL_Color));
+    //        }
+    //    }
+    //
+    //    for (auto x{bottom_left.x}; x <= bottom_right.x; x++) {
+    //        if (check_in_win_range({x, bottom_left.y})) {
+    //            memcpy(reinterpret_cast<void *>(pixels + (bottom_left.y * window_size.x + x)), &cursor_colour, sizeof(SDL_Color));
+    //        }
+    //    }
+}
+
+
 void process_rendering(AppContext *app) {
     SDL_SetRenderDrawColor(app->renderer, background_colour.r, background_colour.g, background_colour.b,
                            background_colour.a);
@@ -235,28 +366,26 @@ void process_rendering(AppContext *app) {
     int pitch = sizeof(SDL_Color) * window_size.x;
     SDL_LockTexture(app->frame_buffer, nullptr, reinterpret_cast<void **>(&pixels), &pitch);
 
-    for (auto y{0}; y < level_size.y; y++) {
-        for (auto x{0}; x < level_size.x; x++) {
-            auto &cell = app->cells[y][x];
-
-            if (not cell.has_been_updated) {
-                continue;
-            }
+    for (auto n_y{0}; n_y < level_size.y; n_y++) {
+        for (auto n_x{0}; n_x < level_size.x; n_x++) {
+            auto &cell = app->cells[n_y][n_x];
 
             auto &colour = material_colour[std::to_underlying(cell.material)];
 
-            auto top_left = glm::ivec2{x * 2, y * 2};
-            auto top_right = glm::ivec2{x * 2 + 1, y * 2};
-            auto bottom_left = glm::ivec2{x * 2, y * 2 + 1};
-            auto bottom_right = glm::ivec2{x * 2 + 1, y * 2 + 1};
+            auto top_left = glm::ivec2{n_x * 2, n_y * 2};
+            auto top_right = glm::ivec2{n_x * 2 + 1, n_y * 2};
+            auto bottom_left = glm::ivec2{n_x * 2, n_y * 2 + 1};
+            auto bottom_right = glm::ivec2{n_x * 2 + 1, n_y * 2 + 1};
             std::array points{top_left, top_right, bottom_left, bottom_right};
 
-            for (auto &&point: points) {
+            for (auto &point: points) {
                 memcpy(reinterpret_cast<void *>(pixels + (point.y * window_size.x + point.x)), &colour,
                        sizeof(SDL_Color));
             }
         }
     }
+
+    draw_cursor(app, pixels);
 
     SDL_UnlockTexture(app->frame_buffer);
     SDL_RenderTexture(app->renderer, app->frame_buffer, nullptr, nullptr);

@@ -4,7 +4,11 @@
 #include "definitions.h"
 
 #include <SDL3/SDL.h>
+
+#include <glm/vec2.hpp>
+
 #include <algorithm>
+#include <cmath>
 #include <random>
 #include <utility>
 
@@ -30,16 +34,28 @@ public:
     }
 };
 
-auto inline check_x_in_range(const int x) {
+auto inline check_x_in_lvl_range(const int x) {
     return x >= 0 and x < level_size.x;
 }
 
-auto inline check_y_in_range(const int y) {
+auto inline check_y_in_lvl_range(const int y) {
     return y >= 0 and y < level_size.y;
 }
 
-auto inline check_in_range(const glm::ivec2 point) {
-    return check_x_in_range(point.x) and check_y_in_range(point.y);
+auto inline check_in_lvl_range(const glm::ivec2 point) {
+    return check_x_in_lvl_range(point.x) and check_y_in_lvl_range(point.y);
+}
+
+auto inline check_x_in_win_range(const int x) {
+    return x >= 0 and x < window_size.x;
+}
+
+auto inline check_y_in_win_range(const int y) {
+    return y >= 0 and y < window_size.y;
+}
+
+auto inline check_in_win_range(const glm::ivec2 point) {
+    return check_x_in_win_range(point.x) and check_y_in_win_range(point.y);
 }
 
 auto inline colour(const cell_t &cell) {
@@ -52,6 +68,13 @@ auto inline density(const cell_t &cell) {
 
 auto inline slipperiness(const cell_t &cell) {
     return material_slipperiness[std::to_underlying(cell.material)];
+}
+
+auto inline get_mouse_info() {
+    glm::vec2 mouse_fpos;
+    auto mouse_state{SDL_GetMouseState(&mouse_fpos.x, &mouse_fpos.y)};
+    glm::ivec2 mouse_pos{std::lround(mouse_fpos.x), std::lround(mouse_fpos.y)};
+    return std::make_pair(mouse_pos, mouse_state);
 }
 
 /*

@@ -33,24 +33,28 @@ constexpr static std::array material_density{
 
 constexpr static std::array material_slipperiness{
         0,
-        1,
+        0,
         5,
-        1,
+        0,
 };
 
 static_assert(material_colour.size() == std::to_underlying(Material::END_MARKER));
+static_assert(material_density.size() == std::to_underlying(Material::END_MARKER));
+static_assert(material_slipperiness.size() == std::to_underlying(Material::END_MARKER));
 
 constexpr static int g = 1;
 constexpr static int max_y_velocity = 8;
 constexpr static int min_y_velocity = -8;
 
 constexpr static SDL_Color background_colour{93, 88, 90, 255};
+constexpr static SDL_Color cursor_colour{255, 255, 255, 255};
 
 typedef struct cell_t {
-    glm::ivec2 velocity;     // 8 bytes
+    glm::ivec2 velocity;    // 8 bytes
     Material material;      // 1 byte
     bool has_been_updated;  // 1 byte
-    bool displaceable;       // 1 byte
+    bool displaceable;      // 1 byte
+//    bool destructible;      // 1 byte
 
     constexpr cell_t(glm::vec2 velocity, Material material, bool has_been_updated, bool displacable)
             : velocity(
