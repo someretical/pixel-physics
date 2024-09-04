@@ -15,6 +15,7 @@ Head to the [actions tab](https://github.com/someretical/pixel-physics/actions) 
 - Press 1 to select regular sand
 - Press 2 to select water (less dense than regular sand)
 - Press 3 to select red sand (less dense than regular sand but more dense than water)
+- Press F11 to toggle borderless fullscreen
 - More features to come...
 
 ## Building
