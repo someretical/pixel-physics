@@ -81,12 +81,9 @@ SDL_AppResult SDL_AppInit(void **appstate, [[maybe_unused]] int argc, [[maybe_un
     return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppEvent(void *appstate, const SDL_Event *event) {
+SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     auto *app = (AppContext *)appstate;
-    // There is an issue here where the SDL_AppEvent expects a const event pointer
-    // But SDL_ConvertEventToRenderCoordinates expects a non-const event pointer
-    // So the following line just doesn't work
-    // SDL_ConvertEventToRenderCoordinates(app->renderer, event);
+    SDL_ConvertEventToRenderCoordinates(app->renderer, event);
 
     switch (event->type) {
         case SDL_EVENT_MOUSE_WHEEL: {
@@ -98,20 +95,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, const SDL_Event *event) {
             break;
         }
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-            glm::vec2 raw_position{ event->button.x, event->button.y };
-            glm::vec2 logical_position;
-            SDL_RenderCoordinatesFromWindow(
-                app->renderer,
-                raw_position.x,
-                raw_position.y,
-                &logical_position.x,
-                &logical_position.y
-            );
-
             switch (event->button.button) {
                 case SDL_BUTTON_MIDDLE: {
-                    if (check_in_lvl_range({ logical_position.x, logical_position.y })) {
-                        app->cursor.selected_material = app->cells[logical_position.y][logical_position.x].material;
+                    if (check_in_lvl_range({ event->button.x, event->button.y })) {
+                        app->cursor.selected_material = app->cells[event->button.y][event->button.x].material;
                     }
                     break;
                 }
@@ -134,6 +121,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, const SDL_Event *event) {
                 case SDLK_3: {
                     app->cursor.selected_material = Material::RedSand;
                     SDL_Log("Selected material: Red Sand");
+                    break;
+                }
+                case SDLK_F11: {
+                    SDL_SetWindowFullscreen(app->window, SDL_GetWindowFlags(app->window) & SDL_WINDOW_FULLSCREEN ? SDL_FALSE : SDL_TRUE);
                     break;
                 }
                 case SDLK_ESCAPE: {
