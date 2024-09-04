@@ -43,8 +43,7 @@ void process_input(AppContext *app) {
 }
 
 void process_physics(AppContext *app) {
-    bool flip = app->rng.gen_int();
-    // Turn 0 or 1 into -1 or 1
+    bool flip = app->rng.gen_real() > 0.5f;
 
     for (auto y{ level_size.y - 1 }; y >= 0; y--) {
         /*
@@ -64,6 +63,8 @@ void process_physics(AppContext *app) {
                 continue;
             }
 
+            bool flip2 = app->rng.gen_real() > 0.5f;
+
             switch (cell.material) {
                 case Material::END_MARKER:
                 case Material::Air: {
@@ -74,11 +75,9 @@ void process_physics(AppContext *app) {
                     if (not cell.displaceable) {
                         break;
                     }
+
                     // We want to track how far down it can fall and if it can fall at all
-                    cell.velocity.y += g;
-                    if (cell.velocity.y > max_y_velocity) {
-                        cell.velocity.y = max_y_velocity;
-                    }
+                    cell.velocity.y = std::min(cell.velocity.y + g, max_y_velocity);
                     int s_y = 0;
                     // If s_y is equal to cell.velocity.y then we are not obstructed
                     while (s_y < cell.velocity.y) {
@@ -128,24 +127,25 @@ void process_physics(AppContext *app) {
                     // Do not try the strategy of moving to the left and then moving down in one go!
                     // Or rather, you could try it but I already did and my result looked funky
                     // This method looks a lot more natural.
+
+                    // Also for some reason, there are weird looking falling patterns when
+                    // we randomise picking left or right but then try to process both. The only way I could get it to
+                    // look good was to just pick one direction and ignore the other (and hope in subsequent iterations
+                    // the sand picks the other direction if the current one is blocked).
                     glm::ivec2 below_left{ x - 1, y + 1 };
                     glm::ivec2 below_right{ x + 1, y + 1 };
-                    auto first = flip ? below_left : below_right;
-                    auto second = flip ? below_right : below_left;
-                    std::array points{ first, second };
+                    auto test = flip2 ? below_left : below_right;
 
-                    for (auto &point : points) {
-                        if (not check_x_in_lvl_range(point.x)) {
-                            continue;
-                        }
+                    if (not check_x_in_lvl_range(test.x)) {
+                        continue;
+                    }
 
-                        auto &point_cell = app->cells[point.y][point.x];
-                        if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
-                            cell.has_been_updated = true;
-                            point_cell.has_been_updated = true;
-                            std::swap(cell, point_cell);
-                            break;
-                        }
+                    auto &point_cell = app->cells[test.y][test.x];
+                    if (point_cell.displaceable and density_le_chance(point_cell, cell, app->rng)) {
+                        cell.has_been_updated = true;
+                        point_cell.has_been_updated = true;
+                        std::swap(cell, point_cell);
+                        break;
                     }
 
                     break;
@@ -209,7 +209,7 @@ void process_physics(AppContext *app) {
                      */
                     int slip_dir;
                     if (cell.velocity.x == 0) {
-                        slip_dir = !flip ? -1 : 1;
+                        slip_dir = flip2 ? -1 : 1;
                         cell.velocity.x = slip_dir;
                     } else if (cell.velocity.x > 0) {
                         slip_dir = 1;
@@ -236,17 +236,18 @@ void process_physics(AppContext *app) {
                             std::swap(cur_x, next_x_cell);
 
                             // Check if we can fall down
-                            if (y < level_size.y - 1) {
-                                auto below = glm::ivec2{ next_x.x, y + 1 };
-                                auto &next_y_cell = app->cells[below.y][below.x];
-                                if (next_y_cell.displaceable
-                                    and density_le_chance(next_y_cell, next_x_cell, app->rng)) {
-                                    next_y_cell.has_been_updated = true;
-                                    next_x_cell.has_been_updated = true;
-                                    std::swap(next_y_cell, next_x_cell);
-                                    break;
-                                }
-                            }
+                            // According to people, removing this check actually makes the water seem more realistic
+//                            if (y < level_size.y - 1) {
+//                                auto below = glm::ivec2{ next_x.x, y + 1 };
+//                                auto &next_y_cell = app->cells[below.y][below.x];
+//                                if (next_y_cell.displaceable
+//                                    and density_le_chance(next_y_cell, next_x_cell, app->rng)) {
+//                                    next_y_cell.has_been_updated = true;
+//                                    next_x_cell.has_been_updated = true;
+//                                    std::swap(next_y_cell, next_x_cell);
+//                                    break;
+//                                }
+//                            }
                         } else {
                             cur_x.has_been_updated = true;
                             cur_x.velocity.x *= -1;

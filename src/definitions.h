@@ -36,7 +36,7 @@ constexpr static std::array material_density{
 constexpr static std::array material_slipperiness{
     0,
     0,
-    5,
+    3,
     0,
 };
 
