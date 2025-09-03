@@ -2,6 +2,8 @@
 
 A simple 2D physics sandbox game where you can place blocks of different materials and watch them interact with each other.
 
+![demo](./img/demo.png)
+
 
 ## Downloading
 
@@ -26,19 +28,26 @@ The brush is the highlighted square under the cursor.
 - Press 3 to select water
 - Press 4 to select oil (less dense than water)
 
-- More features to come...
+More features to come...
 
-- 
+
 ## Building
 
 ```
 git clone --recurse-submodules https://github.com/someretical/pixel-physics.git
 cd pixel-physics
-cmake -DCMAKE_BUILD_TYPE=Debug   -S . -B cmake-build-debug-[your compiler]
+```
+
+Choose any of the following
+```
+cmake -DCMAKE_BUILD_TYPE=Debug -S . -B cmake-build-debug-[your compiler]
+cmake --build cmake-build-debug-[your compiler] --config=Debug --target pixels -j [no. of threads]
+
 cmake -DCMAKE_BUILD_TYPE=Release -S . -B cmake-build-release-[your compiler]
-cmake --build cmake-build-debug-[your compiler]   --config=Debug   --target pixels -j [no. of threads]
 cmake --build cmake-build-release-[your compiler] --config=Release --target pixels -j [no. of threads]
 ```
+
+`RelWithDebInfo` and `MinSizeRel` build types are also available but I'm too lazy to write them here.
 
 Binaries will be in `cmake-build-debug-[your compiler]` and `cmake-build-release-[your compiler]` respectively.
 
