@@ -7,3 +7,7 @@
 [submodule "dependencies/pcg-cpp"]
 	path = dependencies/pcg-cpp
 	url = https://github.com/imneme/pcg-cpp
+[submodule "dependencies/imgui"]
+	path = dependencies/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking

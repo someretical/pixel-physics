@@ -9,7 +9,6 @@
 // Can't remove this include
 #include <SDL3/SDL_main.h>
 
-#include <glm/ext/vector_float2.hpp>
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_keycode.h>
@@ -20,6 +19,7 @@
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_video.h>
+#include <glm/ext/vector_float2.hpp>
 
 #include <utility>
 
@@ -44,7 +44,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     switch (event->type) {
         case SDL_EVENT_MOUSE_WHEEL: {
             const auto mod{ SDL_GetModState() };
-            const int d_radius{(mod & SDL_KMOD_LCTRL) ? 5 : 1 };
+            const int d_radius{ (mod & SDL_KMOD_LCTRL) ? 5 : 1 };
             if (event->wheel.y > 0) {
                 app->cursor.brush_radius = std::min(app->cursor.brush_radius + d_radius, gui::max_radius);
             } else if (event->wheel.y < 0) {
@@ -55,9 +55,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
             switch (event->button.button) {
                 case SDL_BUTTON_MIDDLE: {
-                    if (check_in_lvl_range({ event->button.x, event->button.y })) {
+                    if (check_in_lvl_range({ static_cast<int>(event->button.x), static_cast<int>(event->button.y) })) {
                         const auto &buf{ app->chunk.buffers.getLatestFrame() };
-                        app->cursor.selected_material = buf[event->button.y][event->button.x].material;
+                        app->cursor.selected_material =
+                            buf[static_cast<int>(event->button.y)][static_cast<int>(event->button.x)].material;
                     }
                     break;
                 }
@@ -121,7 +122,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     auto elapsed_ticks = SDL_GetTicks() - begin;
     if (elapsed_ticks < 16) {
-        SDL_Delay(16 - elapsed_ticks);
+        SDL_Delay(static_cast<uint32_t>(16 - elapsed_ticks));
     }
 
     return app->app_quit;

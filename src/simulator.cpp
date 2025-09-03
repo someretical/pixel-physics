@@ -64,7 +64,7 @@ int physics_thread_start(void *data) {
     uint8_t shuffle_counter = 0;
     colour_update_order_t colours{};
     for (auto i{ 0 }; i < colours.size(); ++i) {
-        colours[i] = i;
+        colours[i] = static_cast<short>(i);
     }
 
     while (not physics_thread_stop_token) {
@@ -91,7 +91,7 @@ int physics_thread_start(void *data) {
 
             auto elapsed_ticks = SDL_GetTicks() - begin;
             if (elapsed_ticks < 2) {
-                SDL_Delay(1 - elapsed_ticks);
+                SDL_Delay(static_cast<uint32_t>(1 - elapsed_ticks));
             }
             SDL_Log("Frame took %llu ms", elapsed_ticks);
         }
@@ -101,7 +101,7 @@ int physics_thread_start(void *data) {
 }
 
 inline void switch_statement(
-    AppContext *app, physics::rng &rngs, sim::cell_matrix_t &write_buf, const int x, const int y
+    AppContext *app [[maybe_unused]], physics::rng &rngs, sim::cell_matrix_t &write_buf, const int x, const int y
 ) {
     auto &cell{ write_buf[y][x] };
 

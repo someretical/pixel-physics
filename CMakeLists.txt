@@ -6,44 +6,65 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
+# SDL
 set(SDL_STATIC ON)
-add_subdirectory(dependencies/SDL EXCLUDE_FROM_ALL)
+add_subdirectory(dependencies/SDL)
 
-add_subdirectory(dependencies/glm EXCLUDE_FROM_ALL)
 
-include_directories(dependencies/pcg-cpp/include)
+# glm
+add_subdirectory(dependencies/glm)
 
-add_executable(pixels src/main.cpp
-        "src/AppContext.cpp"  
-        "src/AppContext.h"
-        "src/cursor.h" 
-        "src/gui.h" 
-        "src/partition_table.h" 
-        "src/physics.h" 
-        "src/sim.h" 
-        "src/simulator.cpp"
-        "src/simulator.h"
-        "src/static_vector.h"
-        "src/textures.h"
-        "src/util.cpp"
-        "src/util.h"
+
+# pcg-cpp
+add_library(pcg-cpp INTERFACE)
+# we use system interface because then the targer compile options for warnings do not apply to this header only library
+target_include_directories(pcg-cpp SYSTEM INTERFACE
+    dependencies/pcg-cpp/include
 )
 
-# if(MSVC)
-#     target_compile_options(pixels PRIVATE /W4 /WX)
-# else()
-#     target_compile_options(pixels PRIVATE -Wall -Wextra -Werror)
-# endif()
+# imgui
+file(GLOB IMGUI_SOURCES 
+    dependencies/imgui/*.cpp
+    dependencies/imgui/backends/imgui_impl_sdlgpu3.cpp
+    dependencies/imgui/backends/imgui_impl_sdl3.cpp
+)
+add_library(imgui STATIC ${IMGUI_SOURCES})
+target_include_directories(imgui PUBLIC 
+    dependencies/imgui
+)
+target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
 
-target_link_libraries(pixels PRIVATE SDL3::SDL3-static)
 
-target_link_libraries(pixels PRIVATE glm::glm)
+# warnings
+add_library(pixels-warnings INTERFACE)
+if(MSVC)
+    target_compile_options(pixels-warnings INTERFACE /W4 /WX)
+else()
+    target_compile_options(pixels-warnings INTERFACE -Wall -Wextra -Werror)
+endif()
+
+
+# pixels
+add_executable(pixels
+    src/main.cpp
+    src/AppContext.cpp
+    src/simulator.cpp
+    src/util.cpp
+)
+target_link_libraries(pixels PRIVATE 
+    pixels-warnings
+    SDL3::SDL3-static 
+    glm::glm
+    pcg-cpp
+)
+
 
 set(TARGET_METADATA "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}-${CMAKE_CXX_COMPILER_ID}-${CMAKE_BUILD_TYPE}")
 set_target_properties(pixels PROPERTIES
         OUTPUT_NAME "${CMAKE_PROJECT_NAME}-${TARGET_METADATA}"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+
 
 get_target_property(CMAKE_OUTPUT_NAME pixels OUTPUT_NAME)
 file(WRITE CMAKE_OUTPUT "${CMAKE_OUTPUT_NAME}")
