@@ -1,23 +1,21 @@
 #include "util.h"
-#include "definitions.h"
 
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_render.h>
-#include <cmath>
 #include <glm/ext/vector_float2.hpp>
 #include <glm/ext/vector_int2.hpp>
-#include <utility>
 
-float density(const cell_t &cell) {
-    return material_density[std::to_underlying(cell.material)];
-}
+#include <cmath>
 
-bool density_le_chance(const cell_t &a, const cell_t &b, Random &rng) {
+bool density_check(const sim::cell_t &a, const sim::cell_t &b, physics::rng &rng) {
     auto diff = density(b) - density(a);
-    return diff != 0.f && rng.gen_real() < diff;
+    if (diff >= 1.0f) {
+        return true;
+    }
+    return diff != 0.0f && rng.floats(rng.rng_f) < diff;
 }
 
 std::pair<glm::ivec2, SDL_MouseButtonFlags> get_mouse_info(SDL_Renderer *renderer) {

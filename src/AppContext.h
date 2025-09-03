@@ -1,62 +1,36 @@
 #ifndef PIXELS_APPCONTEXT_H
 #define PIXELS_APPCONTEXT_H
 
-#include "definitions.h"
+#include "cursor.h"
+#include "partition_table.h"
+#include "sim.h"
+#include "textures.h"
 #include "util.h"
 
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_video.h>
+
 #include <array>
-
-struct Cursor {
-    enum class BrushShape {
-        Square,
-        Circle
-    };
-
-    enum class BrushStroke {
-        Fill,
-        Dotted,
-    };
-
-    Material selected_material = Material::Sand;
-    int brush_radius = 10;
-    BrushShape brush_shape = BrushShape::Square;
-};
+#include <memory>
+#include <optional>
 
 struct AppContext {
-    std::array<std::array<cell_t, level_size.x>, level_size.y> cells;
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    SDL_Texture *frame_buffer;
-    SDL_AppResult app_quit = SDL_APP_CONTINUE;
-    Random rng;
-    Cursor cursor;
+    SDL_Window *window{};
+    SDL_Renderer *renderer{};
+    textures::layers_t texture_layers{};
+    const SDL_PixelFormatDetails *pixel_format{};
+    SDL_Thread *physics_thread{};
+    SDL_AppResult app_quit{ SDL_APP_CONTINUE };
+    Cursor cursor{};
 
-    AppContext(SDL_Window *window, SDL_Renderer *renderer) : window(window), renderer(renderer), rng() {
-        frame_buffer = SDL_CreateTexture(
-            renderer,
-            SDL_PIXELFORMAT_RGBA32,
-            SDL_TEXTUREACCESS_STREAMING,
-            level_size.x,
-            level_size.y
-        );
-        if (not frame_buffer) {
-            SDL_Fail();
-        }
-        for (auto &row : cells) {
-            //            row.fill(cell_t({0, 0}, Material::Sand, true, true));
-            row.fill(air_cell);
-        }
-    }
+    sim::chunk_t chunk{};
 
-    ~AppContext() {
-        SDL_DestroyTexture(frame_buffer);
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-    }
+    static std::optional<AppContext *> Create();
+
+    AppContext();
+    ~AppContext();
 };
 
 #endif // PIXELS_APPCONTEXT_H

@@ -14,12 +14,26 @@ add_subdirectory(dependencies/glm EXCLUDE_FROM_ALL)
 include_directories(dependencies/pcg-cpp/include)
 
 add_executable(pixels src/main.cpp
-        src/util.cpp
-        src/util.h
-        src/definitions.h
-        src/simulator.cpp
-        src/simulator.h
-        src/AppContext.h)
+        "src/AppContext.cpp"  
+        "src/AppContext.h"
+        "src/cursor.h" 
+        "src/gui.h" 
+        "src/partition_table.h" 
+        "src/physics.h" 
+        "src/sim.h" 
+        "src/simulator.cpp"
+        "src/simulator.h"
+        "src/static_vector.h"
+        "src/textures.h"
+        "src/util.cpp"
+        "src/util.h"
+)
+
+# if(MSVC)
+#     target_compile_options(pixels PRIVATE /W4 /WX)
+# else()
+#     target_compile_options(pixels PRIVATE -Wall -Wextra -Werror)
+# endif()
 
 target_link_libraries(pixels PRIVATE SDL3::SDL3-static)
 
@@ -42,5 +56,3 @@ if (CMAKE_BUILD_TYPE MATCHES Release)
     # Let CMake generate the executable for windows without a console
     set_target_properties(pixels PROPERTIES WIN32_EXECUTABLE TRUE)
 endif ()
-
-
