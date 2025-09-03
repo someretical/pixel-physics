@@ -12,6 +12,7 @@
 #include <glm/ext/vector_int2.hpp>
 
 #include <cstring>
+#include <inttypes.h>
 #include <utility>
 
 extern volatile bool physics_thread_stop_token;
@@ -21,8 +22,6 @@ void process_input(AppContext *app, sim::cell_matrix_t &write_buf) {
     auto radius = app->cursor.brush_radius;
     auto brush_top_left = physics::svec2{ mouse_pos.x - radius, mouse_pos.y - radius };
     auto brush_bottom_right = physics::svec2{ mouse_pos.x + radius, mouse_pos.y + radius };
-    auto brush_top_right = physics::svec2{ mouse_pos.x + radius, mouse_pos.y - radius };
-    auto brush_bottom_left = physics::svec2{ mouse_pos.x - radius, mouse_pos.y + radius };
 
     if (mouse_state & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) {
         for (auto i{ brush_top_left.y }; i < brush_bottom_right.y; i++) {
@@ -93,7 +92,7 @@ int physics_thread_start(void *data) {
             if (elapsed_ticks < 2) {
                 SDL_Delay(static_cast<uint32_t>(1 - elapsed_ticks));
             }
-            SDL_Log("Frame took %llu ms", elapsed_ticks);
+            SDL_Log("Frame took %" PRIu64 " ms", elapsed_ticks);
         }
     }
 
