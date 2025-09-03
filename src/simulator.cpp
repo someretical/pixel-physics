@@ -63,7 +63,7 @@ int physics_thread_start(void *data) {
 
     uint8_t shuffle_counter = 0;
     colour_update_order_t colours{};
-    for (auto i{ 0 }; i < colours.size(); ++i) {
+    for (size_t i{ 0 }; i < colours.size(); ++i) {
         colours[i] = static_cast<short>(i);
     }
 
