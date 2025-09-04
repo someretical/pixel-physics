@@ -26,11 +26,11 @@ std::optional<std::unique_ptr<AppContext>> AppContext::Create() {
         return std::nullopt;
     }
 
-    auto gpu_device{ GPUContext::Create(ctx->window) };
-    if (not gpu_device) {
+    auto gpu_ctx{ GPUContext::Create(ctx->window) };
+    if (not gpu_ctx) {
         return std::nullopt;
     }
-    ctx->gpu_device = std::move(gpu_device.value());
+    ctx->gpu_ctx = std::move(gpu_ctx.value());
 
     if (not SDL_ShowWindow(ctx->window)) {
         return std::nullopt;

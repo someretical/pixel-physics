@@ -19,7 +19,7 @@
 
 struct AppContext {
     SDL_Window *window{};
-    std::unique_ptr<GPUContext> gpu_device{};
+    std::unique_ptr<GPUContext> gpu_ctx{};
     SDL_Thread *physics_thread{};
     SDL_AppResult app_quit{ SDL_APP_CONTINUE };
     Cursor cursor{};
