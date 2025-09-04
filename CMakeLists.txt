@@ -48,6 +48,7 @@ endif()
 add_executable(pixels
     src/main.cpp
     src/AppContext.cpp
+    src/GPUContext.cpp
     src/simulator.cpp
     src/util.cpp
 )
@@ -56,6 +57,7 @@ target_link_libraries(pixels PRIVATE
     SDL3::SDL3-static 
     glm::glm
     pcg-cpp
+    imgui
 )
 
 

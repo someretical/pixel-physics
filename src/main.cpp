@@ -26,11 +26,11 @@
 volatile bool physics_thread_stop_token = false;
 
 SDL_AppResult SDL_AppInit(void **appstate, [[maybe_unused]] int argc, [[maybe_unused]] char *argv[]) {
-    const auto res{ AppContext::Create() };
+    auto res{ AppContext::Create() };
     if (not res.has_value()) {
         return SDL_Fail();
     }
-    *appstate = res.value();
+    *appstate = res.value().release();
 
     SDL_Log("Application started successfully!");
 
