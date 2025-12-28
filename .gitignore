@@ -1,4 +1,4 @@
-## C/C++ .gitignore file
+sett## C/C++ .gitignore file
 
 # Prerequisites
 *.d
@@ -527,4 +527,4 @@ FodyWeavers.xsd
 ## User defined .gitignore file
 build/
 CMAKE_OUTPUT
-.idea/
+.cache/

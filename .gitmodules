@@ -1,6 +1,7 @@
 [submodule "dependencies/SDL"]
 	path = dependencies/SDL
 	url = https://github.com/libsdl-org/SDL
+	branch = main
 [submodule "dependencies/glm"]
 	path = dependencies/glm
 	url = https://github.com/g-truc/glm
@@ -11,3 +12,6 @@
 	path = dependencies/imgui
 	url = https://github.com/ocornut/imgui.git
 	branch = docking
+[submodule "dependencies/boost"]
+	path = dependencies/boost
+	url = https://github.com/boostorg/boost.git

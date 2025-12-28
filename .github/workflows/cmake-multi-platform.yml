@@ -2,11 +2,10 @@ name: CMake on multiple platforms
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
   workflow_dispatch:
-
 
 jobs:
   build:
@@ -17,26 +16,14 @@ jobs:
       fail-fast: false
 
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        build_type: [Release, Debug] # RelWithDebInfo, MinSizeRel
-        c_compiler: [gcc, clang-18, cl]
+        os: [ubuntu-24.04, windows-2025]
         include:
           - os: windows-latest
-            c_compiler: cl
-            cpp_compiler: cl
-          - os: ubuntu-latest
-            c_compiler: gcc
-            cpp_compiler: g++
+            c_compiler: clang-cl
+            cpp_compiler: clang-cl
           - os: ubuntu-latest
             c_compiler: clang-18
             cpp_compiler: clang++-18
-        exclude:
-          - os: windows-latest
-            c_compiler: gcc
-          - os: windows-latest
-            c_compiler: clang-18
-          - os: ubuntu-latest
-            c_compiler: cl
 
     steps:
       - name: Checkout repository
@@ -44,38 +31,26 @@ jobs:
         with:
           submodules: true
 
-      - name: Install newer clang for Linux
-        if: runner.os == 'Linux' && startsWith(matrix.c_compiler, 'clang')
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x ./llvm.sh
-          sudo ./llvm.sh 18
-
       - name: Install packages for Linux
         if: runner.os == 'Linux'
         run: >
-            sudo apt-get update && sudo apt-get install
-            libasound2-dev
-            libjack-jackd2-dev
-            libpipewire-0.3-dev
-            libpulse-dev
-            libsndio-dev
-            freeglut3-dev
-            libdrm-dev
-            libwayland-dev
-            libxkbcommon-dev
-            libdecor-0-dev
-            libudev-dev
-            libibus-1.0-dev
-            libdbus-1-dev
-            libunwind-dev
-            libusb-1.0-0-dev
-            ninja-build
-
-      - name: Install packages for Windows
-        if: runner.os == 'Windows'
-        run: |
-            choco install ninja
+          sudo apt-get update && sudo apt-get install
+          libasound2-dev
+          libjack-jackd2-dev
+          libpipewire-0.3-dev
+          libpulse-dev
+          libsndio-dev
+          freeglut3-dev
+          libdrm-dev
+          libwayland-dev
+          libxkbcommon-dev
+          libdecor-0-dev
+          libudev-dev
+          libibus-1.0-dev
+          libdbus-1-dev
+          libunwind-dev
+          libusb-1.0-0-dev
+          ninja-build
 
       - name: Set reusable strings
         # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
@@ -84,7 +59,6 @@ jobs:
         # The reason we use $$GITHUB_WORKSPACE instead of ${{ github.workspace }} is because on windows, the latter returns a path containing backslashes which is bad
         run: |
           echo "build-output-dir=$GITHUB_WORKSPACE/build" >> "$GITHUB_OUTPUT"
-          echo "bin-dir=$GITHUB_WORKSPACE/build/bin" >> "$GITHUB_OUTPUT"
 
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -96,21 +70,23 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          -G Ninja
+          -G "Ninja Multi-Config"
           -S ${{ github.workspace }}
 
-      - name: Build
-        # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
-        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+      - name: Build Debug
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config Debug
 
-      - name: Find artifacts
-        id: artifacts
-        shell: bash
-        run: |
-          echo "artifact-name=$(cat CMAKE_OUTPUT)" >> "$GITHUB_OUTPUT"
+      - name: Build Release
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config Release
+
+      - name: Build RelWithDebInfo
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config RelWithDebInfo
+
+      - name: Build MinSizeRel
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config MinSizeRel
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.artifacts.outputs.artifact-name }}
-          path: ${{ steps.strings.outputs.bin-dir }}
+          name: build
+          path: ${{ steps.strings.outputs.build-output-dir }}
