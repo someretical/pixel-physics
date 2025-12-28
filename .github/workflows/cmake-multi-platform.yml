@@ -18,10 +18,10 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2025]
         include:
-          - os: windows-latest
+          - os: windows-2025
             c_compiler: clang-cl
             cpp_compiler: clang-cl
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             c_compiler: clang-18
             cpp_compiler: clang++-18
 
@@ -29,7 +29,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
 
       - name: Install packages for Linux
         if: runner.os == 'Linux'
@@ -69,7 +69,6 @@ jobs:
           cmake -B ${{ steps.strings.outputs.build-output-dir }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -G "Ninja Multi-Config"
           -S ${{ github.workspace }}
 
