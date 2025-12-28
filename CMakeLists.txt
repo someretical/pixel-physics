@@ -24,9 +24,15 @@ set(BUILD_SHARED_LIBS
     CACHE BOOL "Build static libs" FORCE)
 add_subdirectory(dependencies/boost EXCLUDE_FROM_ALL)
 
+# spdlog
+add_subdirectory(dependencies/spdlog EXCLUDE_FROM_ALL)
+
 # SDL
 set(SDL_STATIC ON)
 add_subdirectory(dependencies/SDL EXCLUDE_FROM_ALL)
+
+# glm
+add_subdirectory(dependencies/glm EXCLUDE_FROM_ALL)
 
 # glad
 add_library(glad STATIC dependencies/glad/src/gl.c)
@@ -49,21 +55,27 @@ else()
 endif()
 
 # pixels
-add_executable(pixels src/main.cpp)
-target_link_libraries(pixels PRIVATE SDL3::SDL3-static glad imgui)
+add_executable(pixels src/main.cpp src/physics.cpp src/util.cpp)
 
-set(TARGET_QUAD
-    "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}-${CMAKE_CXX_COMPILER_ID}-$<CONFIG>"
-)
+# 0 = Trace, 1 = Debug, 2 = Info, 3 = Warn, 4 = Error, 5 = Critical, 6 = Off
+target_compile_definitions(
+  pixels
+  PRIVATE $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE>
+          $<$<CONFIG:Release>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>
+          $<$<CONFIG:MinSizeRel>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_ERROR>)
+
+target_include_directories(pixels PRIVATE dependencies/pcg-cpp/include)
+target_link_libraries(pixels PRIVATE SDL3::SDL3-static glad imgui
+                                     spdlog::spdlog glm::glm)
+
+set(TARGET_TRIPLE
+    "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}-${CMAKE_CXX_COMPILER_ID}")
 set_target_properties(
-  pixels PROPERTIES OUTPUT_NAME "${CMAKE_PROJECT_NAME}-${TARGET_QUAD}"
-                    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+  pixels
+  PROPERTIES OUTPUT_NAME "${CMAKE_PROJECT_NAME}-${TARGET_TRIPLE}-$<CONFIG>"
+             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+             WIN32_EXECUTABLE $<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>)
 
 if(MSVC)
   target_link_options(pixels PRIVATE "/MANIFEST:EMBED")
-endif()
-
-if(CMAKE_BUILD_TYPE MATCHES Release)
-  # Let CMake generate the executable for windows without a console
-  set_target_properties(pixels PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()

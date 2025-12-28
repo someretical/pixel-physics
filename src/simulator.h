@@ -2,7 +2,6 @@
 #define PIXELS_SIMULATOR_H
 
 #include "AppContext.h"
-#include "partition_table.h"
 #include "physics.h"
 
 void process_input(AppContext *app, sim::cell_matrix_t &write_buf);

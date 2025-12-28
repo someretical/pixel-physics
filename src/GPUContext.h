@@ -6,19 +6,19 @@
 #include <memory>
 #include <optional>
 
-struct GPUContext {
-    SDL_GPUDevice *device{};
-    SDL_GPUTexture *pixels_texture{};
-    SDL_GPUTexture *gui_texture{};
-    SDL_GPUGraphicsPipeline *pixel_pipeline;
-    SDL_GPUGraphicsPipeline *gui_pipeline;
-    SDL_GPUBuffer *vertex_buffer;
-    SDL_GPUSampler *nearest_sampler; // for pixels and gui textures (sharp pixels when upscaled)
+// struct GPUContext {
+//     SDL_GPUDevice *device{};
+//     SDL_GPUTexture *pixels_texture{};
+//     SDL_GPUTexture *gui_texture{};
+//     SDL_GPUGraphicsPipeline *pixel_pipeline;
+//     SDL_GPUGraphicsPipeline *gui_pipeline;
+//     SDL_GPUBuffer *vertex_buffer;
+//     SDL_GPUSampler *nearest_sampler; // for pixels and gui textures (sharp pixels when upscaled)
 
-    static std::optional<std::unique_ptr<GPUContext>> Create(SDL_Window *window);
+//     static std::optional<std::unique_ptr<GPUContext>> Create(SDL_Window *window);
 
-    GPUContext() = default;
-    ~GPUContext();
-};
+//     GPUContext() = default;
+//     ~GPUContext();
+// };
 
 #endif // PIXELS_GPUCONTEXT_H
