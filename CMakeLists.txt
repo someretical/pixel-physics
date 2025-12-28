@@ -1,4 +1,12 @@
 cmake_minimum_required(VERSION 3.25)
+
+# Enforce Ninja Multi-Config
+if(NOT CMAKE_GENERATOR MATCHES "Ninja Multi-Config")
+  message(FATAL_ERROR "This project requires the Ninja generator.\n"
+                      "Please use: -G \"Ninja Multi-Config\"")
+endif()
+set(CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo;MinSizeRel")
+
 project(pixels)
 include(CMakePrintHelpers)
 
@@ -45,7 +53,7 @@ add_executable(pixels src/main.cpp)
 target_link_libraries(pixels PRIVATE SDL3::SDL3-static glad imgui)
 
 set(TARGET_QUAD
-    "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}-${CMAKE_CXX_COMPILER_ID}-${CMAKE_BUILD_TYPE}"
+    "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}-${CMAKE_CXX_COMPILER_ID}-$<CONFIG>"
 )
 set_target_properties(
   pixels PROPERTIES OUTPUT_NAME "${CMAKE_PROJECT_NAME}-${TARGET_QUAD}"
