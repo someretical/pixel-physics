@@ -1,16 +1,20 @@
 #ifndef PIXELS_PHYSICS_H
 #define PIXELS_PHYSICS_H
 
+#include "util.h"
+
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_rect.h>
 #include <array>
 #include <barrier>
 #include <condition_variable>
 #include <glm/detail/type_vec2.hpp>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <pcg_random.hpp>
-#include <random>
-#include <spdlog/spdlog.h>
+#include <spdlog/logger.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <stop_token>
 #include <thread>
 
@@ -34,20 +38,6 @@ constexpr static int b{7};
 constexpr static int k{16};
 
 using svec2 = glm::tvec2<short, glm::packed_highp>;
-
-struct rng
-{
-    pcg32 rng_s{pcg_extras::seed_seq_from<std::random_device>{}};
-    std::array<std::uniform_int_distribution<short>, 8> shorts{
-        std::uniform_int_distribution<short>(0, 1), std::uniform_int_distribution<short>(0, 2),
-        std::uniform_int_distribution<short>(0, 3), std::uniform_int_distribution<short>(0, 4),
-        std::uniform_int_distribution<short>(0, 5), std::uniform_int_distribution<short>(0, 6),
-        std::uniform_int_distribution<short>(0, 7), std::uniform_int_distribution<short>(0, 8),
-    };
-
-    pcg32 rng_f{pcg_extras::seed_seq_from<std::random_device>{}};
-    std::uniform_real_distribution<float> floats{0.0f, 1.0f};
-};
 
 enum material : uint8_t
 {
@@ -152,26 +142,49 @@ class TripleBuffer
     }
 };
 
-void physics_worker_main(std::stop_token st, int id, core::AppContext *ctx);
+class Engine; // forward declaration
+void physics_worker_main(std::stop_token st, int id, physics::Engine *engine);
 struct Engine
 {
+  private:
+    struct Token
+    {
+    };
+
+  public:
+    std::shared_ptr<spdlog::logger> logger;
 
     std::atomic<bool> paused{false};
     std::mutex pause_mutex;
     std::condition_variable_any pause_cv;
 
-    constexpr static int NUM_WORKERS = 1;
-    std::array<std::jthread, NUM_WORKERS> workers;
+    constexpr static int NUM_WORKERS = 4;
     std::barrier<> step_barrier{NUM_WORKERS};
 
-    Engine(core::AppContext *ctx)
+    // this must come last so it is the first to be destroyed
+    // this ensures all above shared members remain intact
+    std::array<std::jthread, NUM_WORKERS> workers;
+
+    static std::optional<std::unique_ptr<Engine>> Create()
     {
-        spdlog::trace("Spawning {} physics worker threads", NUM_WORKERS);
+        auto engine = std::make_unique<Engine>(Token{});
+
+        engine->logger = spdlog::stdout_color_mt("PhysicsEngine");
+        engine->logger->set_level(spdlog::level::trace);
+        engine->logger->set_pattern(util::SPDLOG_FORMAT);
+        engine->logger->trace("Creating PhysicsEngine...");
+
         for (int i = 0; i < NUM_WORKERS; ++i)
         {
-            workers[i] = std::jthread(physics_worker_main, i, ctx);
-            spdlog::trace("  Spawned thread {}", i);
+            engine->logger->trace("Spawning physics thread {}/{}", i + 1, NUM_WORKERS);
+            engine->workers[i] = std::jthread(physics_worker_main, i, engine.get());
         }
+
+        return engine;
+    }
+
+    Engine(Token)
+    {
     }
 
     ~Engine()
@@ -179,6 +192,17 @@ struct Engine
         for (int i = 0; i < NUM_WORKERS; ++i)
         {
             workers[i].request_stop();
+            logger->trace("Requested stop for physics thread {}/{}", i + 1, NUM_WORKERS);
+        }
+
+        paused.store(false);
+        pause_cv.notify_all(); // this actually acquires the lock internally (at least on MSVC)
+        logger->trace("Notified all physics threads");
+
+        for (int i = 0; i < NUM_WORKERS; ++i)
+        {
+            workers[i].join();
+            logger->trace("Joined physics thread {}/{}", i + 1, NUM_WORKERS);
         }
     }
 };

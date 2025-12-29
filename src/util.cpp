@@ -12,15 +12,15 @@
 
 namespace pixels::util
 {
-bool density_check(const cell &a, const cell &b, physics::rng &rng)
-{
-    auto diff = b.density() - a.density();
-    if (diff >= 1.0f)
-    {
-        return true;
-    }
-    return diff != 0.0f && rng.floats(rng.rng_f) < diff;
-}
+// bool density_check(const cell &a, const cell &b, physics::rng &rng)
+// {
+//     auto diff = b.density() - a.density();
+//     if (diff >= 1.0f)
+//     {
+//         return true;
+//     }
+//     return diff != 0.0f && rng.floats(rng.rng_f) < diff;
+// }
 
 std::pair<glm::ivec2, SDL_MouseButtonFlags> get_mouse_info(SDL_Renderer *renderer)
 {

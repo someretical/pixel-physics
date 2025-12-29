@@ -1,5 +1,4 @@
 #include "physics.h"
-#include "AppContext.h"
 
 #include <SDL3/SDL_timer.h>
 #include <spdlog/spdlog.h>
@@ -9,44 +8,40 @@ using namespace pixels;
 
 namespace pixels::physics
 {
-void physics_worker_main(std::stop_token st, int id, pixels::core::AppContext *ctx)
+void physics_worker_main(std::stop_token st, int id, physics::Engine *engine)
 {
-    spdlog::trace("Starting...", id);
+    auto &logger = engine->logger;
+    logger->trace("Started...");
+    auto &barrier = engine->step_barrier;
 
-    auto &step_barrier = ctx->physics_engine.step_barrier;
-    auto &pause_mutex = ctx->physics_engine.pause_mutex;
-    auto &pause_cv = ctx->physics_engine.pause_cv;
-    auto &paused = ctx->physics_engine.paused;
-
-    // make all threads start at the same time
-    step_barrier.arrive_and_wait();
-
-    while (!st.stop_requested())
+    while (true)
     {
-        auto begin{SDL_GetTicks()};
-
+        barrier.arrive_and_wait();
+        if (st.stop_requested())
         {
-            std::unique_lock lock(pause_mutex);
-            pause_cv.wait(lock, [&] { return !paused.load() || st.stop_requested(); });
+            barrier.arrive_and_drop();
+            logger->trace("Exiting...");
+            break;
         }
 
-        if (st.stop_requested())
-            break;
-
-        spdlog::trace("Doing fake work...", id);
+        auto begin{SDL_GetTicks()};
 
         auto elapsed_ticks{SDL_GetTicks() - begin};
         if (elapsed_ticks < TICK_DELAY)
         {
-            SDL_Delay(static_cast<uint32_t>(TICK_DELAY - elapsed_ticks));
+            SDL_Delay(TICK_DELAY - elapsed_ticks);
         }
-        spdlog::trace("Tick took {}ms", elapsed_ticks);
 
-        step_barrier.arrive_and_wait();
+        logger->trace("Performing physics step (leftover time: {} ms)", TICK_DELAY - elapsed_ticks);
+
+        {
+            // have to use unique lock with cv_any.wait
+            std::unique_lock lock(engine->pause_mutex);
+            engine->pause_cv.wait(lock, st, [&] { return !engine->paused.load(); });
+        }
     }
-
-    spdlog::trace("Exiting...", id);
 }
+} // namespace pixels::physics
 
 // void physics_process_input(cell_matrix_t &write_buf)
 // {
@@ -85,4 +80,3 @@ void physics_worker_main(std::stop_token st, int id, pixels::core::AppContext *c
 //         }
 //     }
 // }
-} // namespace pixels::physics

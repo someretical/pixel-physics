@@ -1,11 +1,10 @@
 #ifndef PIXELS_APPCONTEXT_H
 #define PIXELS_APPCONTEXT_H
 
-#include "GPUContext.h"
-#include "SDL3/SDL_error.h"
 // #include "gpu.h"
-#include "gui.h"
+#include "gpu.h"
 #include "physics.h"
+#include "util.h"
 
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_pixels.h>
@@ -13,7 +12,7 @@
 #include <SDL3/SDL_video.h>
 #include <memory>
 #include <optional>
-#include <spdlog/spdlog.h>
+#include <spdlog/logger.h>
 
 namespace pixels::core
 {
@@ -25,63 +24,49 @@ struct AppContext
     };
 
   public:
-    SDL_Window *window{};
     // std::unique_ptr<GPUContext> gpu_ctx{};
-    physics::Engine physics_engine;
+    std::unique_ptr<physics::Engine> physics_engine{nullptr};
+    std::unique_ptr<gpu::Engine> gpu_engine{nullptr};
     SDL_AppResult app_result{SDL_APP_CONTINUE};
-    gui::Cursor cursor{};
 
     physics::TripleBuffer pixels{};
 
+    std::shared_ptr<spdlog::logger> logger;
+
     static std::optional<std::unique_ptr<AppContext>> Create()
     {
-        if (not SDL_Init(SDL_INIT_VIDEO))
+        auto ctx = std::make_unique<AppContext>(Token{});
+
+        ctx->logger = spdlog::stdout_color_mt("AppContext");
+        ctx->logger->set_level(spdlog::level::trace);
+        ctx->logger->set_pattern(util::SPDLOG_FORMAT);
+
+        ctx->logger->trace("Creating AppContext...");
+
+        auto gpu = gpu::Engine::Create();
+        if (not gpu.has_value())
         {
-            spdlog::error("SDL_Init failed: {}", SDL_GetError());
+            ctx->logger->error("gpu::Engine::Create failed");
             return std::nullopt;
         }
+        ctx->gpu_engine = std::move(*gpu);
 
-        const auto display_id{SDL_GetPrimaryDisplay()};
-        if (not display_id)
+        auto physics = physics::Engine::Create();
+        if (not physics.has_value())
         {
-            spdlog::error("SDL_GetPrimaryDisplay failed");
+            ctx->logger->error("physics::Engine::Create failed");
             return std::nullopt;
         }
-
-        const auto display_scale{SDL_GetDisplayContentScale(display_id)};
-        if (display_scale == 0.f)
-        {
-            spdlog::error("SDL_GetDisplayContentScale failed");
-            return std::nullopt;
-        }
-
-        auto ctx{std::make_unique<AppContext>(Token{})};
-        if (not(ctx->window = SDL_CreateWindow("Pixel Physics", physics::level_bounds.w, physics::level_bounds.h,
-                                               SDL_WINDOW_KEYBOARD_GRABBED)))
-        {
-            spdlog::error("SDL_CreateWindow failed: {}", SDL_GetError());
-            return std::nullopt;
-        }
-
-        int width, height, bb_width, bb_height;
-        SDL_GetWindowSize(ctx->window, &width, &height);
-        SDL_GetWindowSizeInPixels(ctx->window, &bb_width, &bb_height);
-        spdlog::debug("Display information:");
-        spdlog::debug("  ID: \t{}", display_id);
-        spdlog::debug("  Name: \t{}", SDL_GetDisplayName(display_id));
-        spdlog::debug("  Scale: \t{}%", display_scale * 100);
-
-        spdlog::debug("Window information:");
-        spdlog::debug("  Size: \t{}x{}", width, height);
-        spdlog::debug("  Backbuffer size: \t{}x{}", bb_width, bb_height);
+        ctx->physics_engine = std::move(*physics);
 
         return ctx;
     }
 
     // Token is a private member so only the static factory method can construct a new instance
-    AppContext(Token) : physics_engine(this) {};
+    AppContext(Token) {};
     ~AppContext()
     {
+        logger->trace("AppContext destructor called");
     }
 
     // Delete the Copy Constructor
