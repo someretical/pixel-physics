@@ -56,7 +56,20 @@ jobs:
       - name: Setup sccache
         uses: mozilla/sccache-action@v0.0.9
 
-      - name: Install packages for Linux
+      - name: Install Dawn packages for Linux
+        if: runner.os == 'Linux'
+        run: >
+          sudo apt-get update && sudo apt-get install
+          libxrandr-dev
+          libxinerama-dev
+          libxcursor-dev
+          mesa-common-dev
+          libx11-xcb-dev
+          pkg-config
+          nodejs
+          npm
+
+      - name: Install SDL packages for Linux
         if: runner.os == 'Linux'
         run: >
           sudo apt-get update && sudo apt-get install
