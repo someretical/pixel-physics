@@ -2,7 +2,10 @@
   "cSpell.words": [
     "Cousine",
     "DCMAKE",
+    "DDAWN",
     "freeglut",
+    "GLFW",
+    "GLSL",
     "ilammy",
     "imconfig",
     "IMGUI",
@@ -27,11 +30,16 @@
     "Parameteri",
     "Programiv",
     "Roboto",
+    "sccache",
     "segoeui",
     "Shaderiv",
+    "SPIR",
     "SSBO",
     "usampler",
+    "WEBGPU",
     "Werror",
-    "Wextra"
+    "Wextra",
+    "WGPU",
+    "WGSL"
   ]
 }

@@ -18,3 +18,6 @@
 [submodule "dependencies/spdlog"]
 	path = dependencies/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "dependencies/dawn"]
+	path = dependencies/dawn
+	url = https://github.com/google/dawn.git

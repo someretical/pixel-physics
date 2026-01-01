@@ -1,7 +1,6 @@
 #ifndef PIXELS_APPCONTEXT_H
 #define PIXELS_APPCONTEXT_H
 
-// #include "gpu.h"
 #include "gpu.h"
 #include "physics.h"
 #include "util.h"
@@ -24,12 +23,9 @@ struct AppContext
     };
 
   public:
-    // std::unique_ptr<GPUContext> gpu_ctx{};
     std::unique_ptr<physics::Engine> physics_engine{nullptr};
     std::unique_ptr<gpu::Engine> gpu_engine{nullptr};
     SDL_AppResult app_result{SDL_APP_CONTINUE};
-
-    physics::TripleBuffer pixels{};
 
     std::shared_ptr<spdlog::logger> logger;
 

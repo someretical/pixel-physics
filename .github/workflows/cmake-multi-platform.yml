@@ -6,10 +6,19 @@ on:
   pull_request:
     branches: ["master"]
   workflow_dispatch:
+    inputs:
+      force_recompile:
+        description: "Ignore cache and recompile"
+        type: boolean
+        default: false
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+
+    env:
+      SCCACHE_RECACHE: ${{ inputs.force_recompile == true && '1' || '0' }}
+      SCCACHE_GHA_ENABLED: "true"
 
     strategy:
       # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
@@ -29,7 +38,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          fetch-depth: 1
+
+      - name: Checkout Submodules except Dawn
+        run: |
+          git submodule init
+
+          # Tell git to ignore the 'dawn' directory (replace with your actual path)
+          git config submodule.dependencies/dawn.update none
+
+          # Recursively update everything else
+          git submodule update --init --recursive --depth 1
+
+      - name: Setup sccache
+        uses: mozilla/sccache-action@v0.0.9
 
       - name: Install packages for Linux
         if: runner.os == 'Linux'
@@ -69,6 +91,8 @@ jobs:
           cmake -B ${{ steps.strings.outputs.build-output-dir }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           -G "Ninja Multi-Config"
           -S ${{ github.workspace }}
 
@@ -83,6 +107,9 @@ jobs:
 
       - name: Build MinSizeRel
         run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config MinSizeRel
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

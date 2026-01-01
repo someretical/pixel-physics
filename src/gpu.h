@@ -3,16 +3,24 @@
 
 #include "physics.h"
 #include "util.h"
+#include "webgpu/webgpu.h"
 
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_video.h>
-#include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl3.h>
-#include <glad/gl.h>
+#include <backends/imgui_impl_wgpu.h>
 #include <imgui.h>
 #include <memory>
 #include <optional>
 #include <spdlog/spdlog.h>
+#include <webgpu/webgpu_cpp.h>
+
+#if defined(SDL_PLATFORM_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN 1
+#endif
+#include <windows.h>
+#endif
 
 namespace pixels::gpu
 {
@@ -25,7 +33,14 @@ class Engine
 
   public:
     SDL_Window *window{nullptr};
-    SDL_GLContext gl_ctx{nullptr};
+
+    WGPUInstance wgpu_instance{nullptr};
+    WGPUDevice wgpu_device{nullptr};
+    WGPUSurface wgpu_surface{nullptr};
+    WGPUQueue wgpu_queue{nullptr};
+    WGPUSurfaceConfiguration wgpu_surface_configuration{};
+    int wgpu_surface_width{1280};
+    int wgpu_surface_height{800};
 
     std::shared_ptr<spdlog::logger> logger;
 
@@ -58,19 +73,7 @@ class Engine
             return std::nullopt;
         }
 
-        // GL 4.6 + GLSL 130
-        const char *glsl_version = "#version 130";
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
-
-        // Create window with graphics context
-        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-        SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-        SDL_WindowFlags window_flags =
-            SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+        SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
         gpu->window = SDL_CreateWindow("Pixel Physics", (int)(physics::level_bounds.w * display_scale),
                                        (int)(physics::level_bounds.h * display_scale), window_flags);
         if (not gpu->window)
@@ -78,22 +81,50 @@ class Engine
             gpu->logger->error("SDL_CreateWindow failed: {}", SDL_GetError());
             return std::nullopt;
         }
-        gpu->gl_ctx = SDL_GL_CreateContext(gpu->window);
-        if (gpu->gl_ctx == nullptr)
+
+        WGPUTextureFormat preferred_fmt = WGPUTextureFormat_Undefined; // acquired from SurfaceCapabilities
+
+        // Google DAWN backend: Adapter and Device acquisition, Surface creation
+        wgpu::InstanceDescriptor instance_desc = {};
+        static constexpr wgpu::InstanceFeatureName timedWaitAny = wgpu::InstanceFeatureName::TimedWaitAny;
+        instance_desc.requiredFeatureCount = 1;
+        instance_desc.requiredFeatures = &timedWaitAny;
+        wgpu::Instance instance = wgpu::CreateInstance(&instance_desc);
+
+        wgpu::Adapter adapter = RequestAdapter(gpu->logger, instance);
+        ImGui_ImplWGPU_DebugPrintAdapterInfo(adapter.Get());
+
+        gpu->wgpu_device = RequestDevice(gpu->logger, instance, adapter);
+
+        // Create the surface.
+
+        wgpu::Surface surface = CreateWGPUSurface(instance.Get(), gpu->window);
+        if (!surface)
         {
-            gpu->logger->error("SDL_GL_CreateContext failed: {}", SDL_GetError());
-            return std::nullopt;
-        }
-        if (not gladLoadGL(SDL_GL_GetProcAddress))
-        {
-            gpu->logger->error("gladLoadGL failed");
+            gpu->logger->error("CreateWGPUSurface failed");
             return std::nullopt;
         }
 
-        SDL_GL_MakeCurrent(gpu->window, gpu->gl_ctx);
-        SDL_GL_SetSwapInterval(1); // Enable vsync
-        SDL_SetWindowPosition(gpu->window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-        SDL_ShowWindow(gpu->window);
+        // Moving Dawn objects into WGPU handles
+        gpu->wgpu_instance = instance.MoveToCHandle();
+        gpu->wgpu_surface = surface.MoveToCHandle();
+
+        WGPUSurfaceCapabilities surface_capabilities = {};
+        wgpuSurfaceGetCapabilities(gpu->wgpu_surface, adapter.Get(), &surface_capabilities);
+
+        preferred_fmt = surface_capabilities.formats[0];
+
+        // WGPU backend: Adapter and Device acquisition, Surface creation
+        gpu->wgpu_surface_configuration.presentMode = WGPUPresentMode_Mailbox;
+        gpu->wgpu_surface_configuration.alphaMode = WGPUCompositeAlphaMode_Auto;
+        gpu->wgpu_surface_configuration.usage = WGPUTextureUsage_RenderAttachment;
+        gpu->wgpu_surface_configuration.width = gpu->wgpu_surface_width;
+        gpu->wgpu_surface_configuration.height = gpu->wgpu_surface_height;
+        gpu->wgpu_surface_configuration.device = gpu->wgpu_device;
+        gpu->wgpu_surface_configuration.format = preferred_fmt;
+
+        wgpuSurfaceConfigure(gpu->wgpu_surface, &gpu->wgpu_surface_configuration);
+        gpu->wgpu_queue = wgpuDeviceGetQueue(gpu->wgpu_device);
 
         // Setup Dear ImGui context
         IMGUI_CHECKVERSION();
@@ -115,8 +146,14 @@ class Engine
                                             // unnecessary. We leave both here for documentation purpose)
 
         // Setup Platform/Renderer backends
-        ImGui_ImplSDL3_InitForOpenGL(gpu->window, gpu->gl_ctx);
-        ImGui_ImplOpenGL3_Init(glsl_version);
+        ImGui_ImplSDL3_InitForOther(gpu->window);
+
+        ImGui_ImplWGPU_InitInfo init_info;
+        init_info.Device = gpu->wgpu_device;
+        init_info.NumFramesInFlight = 3;
+        init_info.RenderTargetFormat = gpu->wgpu_surface_configuration.format;
+        init_info.DepthStencilFormat = WGPUTextureFormat_Undefined;
+        ImGui_ImplWGPU_Init(&init_info);
 
         int width, height, bb_width, bb_height;
         SDL_GetWindowSize(gpu->window, &width, &height);
@@ -136,12 +173,126 @@ class Engine
     Engine(Token) {};
     ~Engine()
     {
-        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplWGPU_Shutdown();
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
 
-        SDL_GL_DestroyContext(gl_ctx);
+        wgpuSurfaceUnconfigure(wgpu_surface);
+        wgpuSurfaceRelease(wgpu_surface);
+        wgpuQueueRelease(wgpu_queue);
+        wgpuDeviceRelease(wgpu_device);
+        wgpuInstanceRelease(wgpu_instance);
+
         SDL_DestroyWindow(window);
+    }
+
+    void ResizeSurface(int width, int height)
+    {
+        wgpu_surface_configuration.width = wgpu_surface_width = width;
+        wgpu_surface_configuration.height = wgpu_surface_height = height;
+        wgpuSurfaceConfigure(wgpu_surface, (WGPUSurfaceConfiguration *)&wgpu_surface_configuration);
+    }
+
+    static WGPUAdapter RequestAdapter(std::shared_ptr<spdlog::logger> logger, wgpu::Instance &instance)
+    {
+        wgpu::Adapter acquired_adapter;
+        wgpu::RequestAdapterOptions adapter_options;
+        auto onRequestAdapter = [&](wgpu::RequestAdapterStatus status, wgpu::Adapter adapter,
+                                    wgpu::StringView message) {
+            if (status != wgpu::RequestAdapterStatus::Success)
+            {
+                logger->error("Failed to get an adapter: {}", message.data);
+                return;
+            }
+            acquired_adapter = std::move(adapter);
+        };
+
+        // Synchronously (wait until) acquire Adapter
+        wgpu::Future waitAdapterFunc{
+            instance.RequestAdapter(&adapter_options, wgpu::CallbackMode::WaitAnyOnly, onRequestAdapter)};
+        wgpu::WaitStatus waitStatusAdapter = instance.WaitAny(waitAdapterFunc, UINT64_MAX);
+        IM_ASSERT(acquired_adapter != nullptr && waitStatusAdapter == wgpu::WaitStatus::Success &&
+                  "Error on Adapter request");
+        return acquired_adapter.MoveToCHandle();
+    }
+
+    static WGPUDevice RequestDevice(std::shared_ptr<spdlog::logger> logger, wgpu::Instance &instance,
+                                    wgpu::Adapter &adapter)
+    {
+        // Set device callback functions
+        wgpu::DeviceDescriptor device_desc;
+        device_desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous, [](const wgpu::Device &,
+                                                                                   wgpu::DeviceLostReason type,
+                                                                                   wgpu::StringView msg) {
+            spdlog::error("{} error: {}", ImGui_ImplWGPU_GetDeviceLostReasonName((WGPUDeviceLostReason)type), msg.data);
+        });
+        device_desc.SetUncapturedErrorCallback([](const wgpu::Device &, wgpu::ErrorType type, wgpu::StringView msg) {
+            spdlog::error("{} error: {}", ImGui_ImplWGPU_GetErrorTypeName((WGPUErrorType)type), msg.data);
+        });
+
+        wgpu::Device acquired_device;
+        auto onRequestDevice = [&](wgpu::RequestDeviceStatus status, wgpu::Device local_device,
+                                   wgpu::StringView message) {
+            if (status != wgpu::RequestDeviceStatus::Success)
+            {
+                logger->error("Failed to get an device: {}", message.data);
+                return;
+            }
+            acquired_device = std::move(local_device);
+        };
+
+        // Synchronously (wait until) get Device
+        wgpu::Future waitDeviceFunc{
+            adapter.RequestDevice(&device_desc, wgpu::CallbackMode::WaitAnyOnly, onRequestDevice)};
+        wgpu::WaitStatus waitStatusDevice = instance.WaitAny(waitDeviceFunc, UINT64_MAX);
+        IM_ASSERT(acquired_device != nullptr && waitStatusDevice == wgpu::WaitStatus::Success &&
+                  "Error on Device request");
+        return acquired_device.MoveToCHandle();
+    }
+
+    static WGPUSurface CreateWGPUSurface(const WGPUInstance &instance, SDL_Window *window)
+    {
+        SDL_PropertiesID propertiesID = SDL_GetWindowProperties(window);
+
+        ImGui_ImplWGPU_CreateSurfaceInfo create_info = {};
+        create_info.Instance = instance;
+#if defined(SDL_PLATFORM_MACOS)
+        {
+            create_info.System = "cocoa";
+            create_info.RawWindow =
+                (void *)SDL_GetPointerProperty(propertiesID, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
+            return ImGui_ImplWGPU_CreateWGPUSurfaceHelper(&create_info);
+        }
+#elif defined(SDL_PLATFORM_LINUX)
+        if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0)
+        {
+            create_info.System = "wayland";
+            create_info.RawDisplay =
+                (void *)SDL_GetPointerProperty(propertiesID, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, NULL);
+            create_info.RawSurface =
+                (void *)SDL_GetPointerProperty(propertiesID, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, NULL);
+            return ImGui_ImplWGPU_CreateWGPUSurfaceHelper(&create_info);
+        }
+        else if (!SDL_strcmp(SDL_GetCurrentVideoDriver(), "x11"))
+        {
+            create_info.System = "x11";
+            create_info.RawWindow = (void *)SDL_GetNumberProperty(propertiesID, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
+            create_info.RawDisplay =
+                (void *)SDL_GetPointerProperty(propertiesID, SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
+            return ImGui_ImplWGPU_CreateWGPUSurfaceHelper(&create_info);
+        }
+#elif defined(SDL_PLATFORM_WIN32)
+        {
+            create_info.System = "win32";
+            create_info.RawWindow =
+                (void *)SDL_GetPointerProperty(propertiesID, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+            create_info.RawInstance = (void *)::GetModuleHandle(NULL);
+            return ImGui_ImplWGPU_CreateWGPUSurfaceHelper(&create_info);
+        }
+#else
+#error "Unsupported WebGPU native platform!"
+#endif
+        return nullptr;
     }
 };
 } // namespace pixels::gpu
