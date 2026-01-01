@@ -47,6 +47,9 @@ jobs:
           # Tell git to ignore the 'dawn' directory (replace with your actual path)
           git config submodule.dependencies/dawn.shallow true
 
+          # Shallow clone all submodules
+          git submodule update --init --depth 1
+
           # Recursively update everything else
           git submodule update --init --recursive --depth 1 -- ":(exclude)dependencies/dawn"
 
