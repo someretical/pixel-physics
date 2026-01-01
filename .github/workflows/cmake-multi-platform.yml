@@ -45,10 +45,10 @@ jobs:
           git submodule init
 
           # Tell git to ignore the 'dawn' directory (replace with your actual path)
-          git config submodule.dependencies/dawn.update none
+          git config submodule.dependencies/dawn.shallow true
 
           # Recursively update everything else
-          git submodule update --init --recursive --depth 1
+          git submodule update --init --recursive --depth 1 -- ":(exclude)dependencies/dawn"
 
       - name: Setup sccache
         uses: mozilla/sccache-action@v0.0.9
