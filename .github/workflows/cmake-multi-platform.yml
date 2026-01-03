@@ -46,8 +46,10 @@ jobs:
           # 1. Initialize all submodules
           git submodule init
 
+
           # 2. Setup Sparse-Checkout for Boost
           # Note: Use -C to run git commands inside the submodule directory
+          git submodule update --init --depth 1 --no-checkout dependencies/boost
           git -C dependencies/boost sparse-checkout init --cone
           git -C dependencies/boost sparse-checkout set \
             libs/system libs/config libs/core libs/assert \
