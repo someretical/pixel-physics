@@ -41,32 +41,17 @@ jobs:
           fetch-depth: 1
 
       - name: Checkout Submodules
-        shell: bash
         run: |
-          # 1. Initialize all submodules
           git submodule init
 
+          # Tell git to ignore the 'dawn' directory (replace with your actual path)
+          git config submodule.dependencies/dawn.shallow true
 
-          # 2. Setup Sparse-Checkout for Boost
-          # Note: Use -C to run git commands inside the submodule directory
-          git submodule update --init --depth 1 --no-checkout dependencies/boost
-          git -C dependencies/boost sparse-checkout init --cone
-          git -C dependencies/boost sparse-checkout set \
-            libs/system libs/config libs/core libs/assert \
-            libs/static_assert libs/throw_exception libs/type_traits \
-            libs/predef libs/winapi CMakeLists.txt boost-install.cmake
+          # Shallow clone all submodules
+          git submodule update --init --depth 1
 
-          # 3. Pull Boost (bare minimum)
-          git submodule update --init --depth 1 dependencies/boost
-
-          # 4. Pull Dawn (top-level only, NO submodules)
-          git submodule update --init --depth 1 dependencies/dawn
-
-          # 5. Pull everything else (recursively)
-          # We use forward slashes even on Windows; Git Bash handles the translation
-          git submodule update --init --recursive --depth 1 \
-            -- ":(exclude)dependencies/boost" \
-            -- ":(exclude)dependencies/dawn"
+          # Recursively update everything else
+          git submodule update --init --recursive --depth 1 -- ":(exclude)dependencies/dawn"
 
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.9
