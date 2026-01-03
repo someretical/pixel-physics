@@ -7,15 +7,16 @@ if(NOT CMAKE_GENERATOR MATCHES "Ninja Multi-Config")
 endif()
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo;MinSizeRel")
 
-project(pixels)
-include(CMakePrintHelpers)
-
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
+set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded")
+set(CMAKE_POLICY_CMP0141 NEW)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+
+project(pixels)
+include(CMakePrintHelpers)
 
 # Boost
 set(BOOST_INCLUDE_LIBRARIES system)
